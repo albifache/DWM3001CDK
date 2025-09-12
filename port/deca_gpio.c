@@ -13,6 +13,8 @@
 #define DW_RST_GPIO_DEV_NODE        DT_NODELABEL(gpio0)
 #define DW_RST_GPIO_PIN             25
 
+#define DW_RST_TIME                 5
+
 
 static const struct device *rst_gpio_dev;
 
@@ -47,9 +49,10 @@ void deca_reset_ic(void)
 {
     // Pull RST pin low
     gpio_pin_set(rst_gpio_dev, DW_RST_GPIO_PIN, 0);
-    k_msleep(5);
+    k_msleep(DW_RST_TIME);
     
     // Relrease RST pin
     gpio_pin_set(rst_gpio_dev, DW_RST_GPIO_PIN, 1);
-    k_msleep(5);
+    k_msleep(DW_RST_TIME);
+
 }
