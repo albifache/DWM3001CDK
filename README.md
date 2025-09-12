@@ -2,7 +2,8 @@
 
 ## License
 
-This project is distributed under the **GNU AGPL v3.0 License**. See the [LICENSE](LICENSE) file for details.
+This project is distributed under the **GNU AGPL v3.0 License** (Check [LICENSE](LICENSE) file for details). If you need a different license please contact the author via [LinkedIn](https://www.linkedin.com/in/alberto-facheris-9028ab357/) or [E-mail](mailto:albi97.fache@gmail.com)
+
 
 ## Overview
 
