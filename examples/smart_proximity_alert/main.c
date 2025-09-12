@@ -93,7 +93,7 @@ int main (void)
     app_set_tag_mac_addr(tag_mac_addr);
 
     // Set anchors MAC addresses
-    if (NUM_ANCHORS > NUM_LEDS || NUM_ANCHORS != sizeof(anchor_mac_addr)/sizeof(uint16_t)) while(1);
+    if (NUM_ANCHORS > NUM_LEDS || NUM_ANCHORS != sizeof(anchor_mac_addr) / sizeof(uint16_t)) while(1);
     app_set_anchor_mac_addr(anchor_mac_addr, NUM_ANCHORS);
 
     // Begin loop
