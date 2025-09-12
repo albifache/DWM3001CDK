@@ -13,7 +13,7 @@ An advanced real-time positioning framework for DWM3001CDK modules, delivering p
 - **Qorvo/Decawave DW3000 driver** (slightly modified to reduce unnecessary memory usage)
 - **Port to Zephyr RTOS** for DWM3001CDK modules (nRF52833 MCU)
 - **Low-level functions** to access precalibrated parameters stored in DW3000 OTP memory
-- **Application protocol** based on IEEE 802.15.4 standard, relying on DS-TWR to measure distances and TDMA to handle multiple concurrent devices without collisions, while also featuring a novel dynamic role assignment protocol
+- **Application protocol** based on IEEE 802.15.4 standard, relying on DS-TWR to measure distances and TDMA to handle multiple concurrent devices without collisions, while also featuring a novel, dynamic, real-time and over-the-air role assignment protocol 
 
 ## Features
 
