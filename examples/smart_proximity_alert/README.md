@@ -47,7 +47,7 @@ The example is configured to operate with:
 - **One tag** (MAC address 0x00) 
 - **Two anchors** (MAC addresses 0x06 and 0x07)
 - **PAN ID** set to 0x00 (must be the same for all nodes)
-- **Alert distance** set to 50 cm
+- **Alert distance** set to 1 m
 - **LED mapping**: 
   - LED 3 (blue) blinks for anchor node 0x06
   - LED 1 (red) blinks for anchor node 0x07
@@ -58,10 +58,9 @@ The example is configured to operate with:
 Edit the main configuration in `main.c`:
 
 ```c
-#define NUM_ANCHORS     2                             // Number of anchor nodes
 #define BLUE_LED        3                             // LED ID (0 to 3)
 #define RED_LED         1                             // LED ID (0 to 3)  
-#define ALERT_DIST      0.5f                          // Alert distance in meters
+#define ALERT_DIST      1.0f                          // Alert distance in meters
 
 static uint16_t my_mac_addr = 0x00;                   // MAC address of this node
 static uint16_t my_pan_id = 0x00;                     // PAN ID for all nodes

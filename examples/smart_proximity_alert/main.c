@@ -16,8 +16,6 @@
 #define PRECAL_TX_POWER                 0
 #define PRECAL_ANT_DELAY                0
 
-#define NUM_ANCHORS                     2                   // Number of anchors
-
 #define BLUE_LED                        3
 #define RED_LED                         1
 
@@ -27,20 +25,21 @@
 
 #define LIGHT_SPEED                     2.99702547e8f       // Speed of light (m/s)
 
-#define ALERT_DIST                      0.5f                // Alert distance (m)
+#define ALERT_DIST                      1.0f                // Alert distance (m)
 
 
-static uint16_t my_mac_addr = 0x00;
+static uint16_t my_mac_addr = 0x07;
 static uint16_t my_pan_id = 0x00;
 
 static uint16_t tag_mac_addr = PAN_COORDINATOR_MAC_ADDR;
 static uint16_t anchor_mac_addr[] = {0x06, 0x07};
+static uint8_t num_anchors = sizeof(anchor_mac_addr) / sizeof(uint16_t);
 
 static uint8_t led_id[] = {BLUE_LED, RED_LED};
 static bool led_state[] = {false, false};
 
 static app_ranging_info_t ranging_info;
-static float dist[NUM_ANCHORS];
+static float dist[NUM_LEDS];
 
 static uint16_t ant_delay = PRECAL_ANT_DELAY ;
 static uint32_t tx_power = PRECAL_TX_POWER;
@@ -93,8 +92,8 @@ int main (void)
     app_set_tag_mac_addr(tag_mac_addr);
 
     // Set anchors MAC addresses
-    if (NUM_ANCHORS > NUM_LEDS || NUM_ANCHORS != sizeof(anchor_mac_addr) / sizeof(uint16_t)) while(1);
-    app_set_anchor_mac_addr(anchor_mac_addr, NUM_ANCHORS);
+    if (num_anchors > NUM_LEDS) while(1);
+    app_set_anchor_mac_addr(anchor_mac_addr, num_anchors);
 
     // Begin loop
     while (1)
@@ -112,13 +111,13 @@ int main (void)
         app_get_ranging_info(&ranging_info);
         
         // Compute distances (m)
-        for (int k = 0; k < NUM_ANCHORS; k++)
+        for (int k = 0; k < num_anchors; k++)
         {
             dist[k] = LIGHT_SPEED * DWT_TIME_UNITS * ranging_info.dist[k];
         }
 
         // Set LEDs states if tag is too close to the anchors
-        for (int k = 0; k < NUM_ANCHORS; k++)
+        for (int k = 0; k < num_anchors; k++)
         {
             if (dist[k] < ALERT_DIST && dist[k] > 0 && my_mac_addr == tag_mac_addr)
             {
@@ -127,7 +126,7 @@ int main (void)
         }
 
         // Switch on LEDs
-        for (int k = 0; k < NUM_ANCHORS; k++)
+        for (int k = 0; k < num_anchors; k++)
         {
             led_gpio_write(led_id[k], led_state[k]);
         }
@@ -136,13 +135,13 @@ int main (void)
         app_sleep(BLINK_TIME);
 
         // Reset LEDs states
-        for (int k = 0; k < NUM_ANCHORS; k++)
+        for (int k = 0; k < num_anchors; k++)
         {
             led_state[k] = false;
         }
 
         // Switch off LEDs
-        for (int k = 0; k < NUM_ANCHORS; k++)
+        for (int k = 0; k < num_anchors; k++)
         {
             led_gpio_write(led_id[k], led_state[k]);
         }
