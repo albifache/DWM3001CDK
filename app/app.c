@@ -76,8 +76,8 @@ typedef enum
     APP_STATE_WAIT_RESP_MSG = 6,
     APP_STATE_SEND_RPT_MSG = 7,
     APP_STATE_WAIT_RPT_MSG = 8,
-    APP_STATE_SEND_FNL_MSG = 9,
-    APP_STATE_WAIT_FNL_MSG = 10,
+    APP_STATE_SEND_FINAL_MSG = 9,
+    APP_STATE_WAIT_FINAL_MSG = 10,
     APP_STATE_END = 11
 }
 app_state_e;
@@ -946,7 +946,7 @@ int app_run_ieee_802_15_4_schedule (void)
                     if (node_type == LISTENER)
                     {
                         slot_id = 3 + num_anchors;
-                        app_state = APP_STATE_WAIT_FNL_MSG;
+                        app_state = APP_STATE_WAIT_FINAL_MSG;
                     }
 
                     // Check if node was selected as tag
@@ -984,7 +984,7 @@ int app_run_ieee_802_15_4_schedule (void)
                     if (node_type == LISTENER)
                     {
                         slot_id = 3 + num_anchors;
-                        app_state = APP_STATE_WAIT_FNL_MSG;
+                        app_state = APP_STATE_WAIT_FINAL_MSG;
                     }
 
                     // Check if node was selected as tag
@@ -1012,7 +1012,7 @@ int app_run_ieee_802_15_4_schedule (void)
                 if (ret != APP_SUCCESS)
                 {
                     slot_id = 3 + num_anchors;
-                    app_state =  APP_STATE_WAIT_FNL_MSG;
+                    app_state =  APP_STATE_WAIT_FINAL_MSG;
                 }
 
                 // Proceed if REQUEST message is successfully sent
@@ -1032,7 +1032,7 @@ int app_run_ieee_802_15_4_schedule (void)
                 if (ret != APP_SUCCESS)
                 {
                     slot_id = 3 + num_anchors;
-                    app_state = APP_STATE_WAIT_FNL_MSG;   
+                    app_state = APP_STATE_WAIT_FINAL_MSG;   
                 }
 
                 // Proceed if REQUEST message is received
@@ -1052,7 +1052,7 @@ int app_run_ieee_802_15_4_schedule (void)
                 if (ret != APP_SUCCESS)
                 {
                     slot_id = 3 + num_anchors;
-                    app_state = APP_STATE_WAIT_FNL_MSG;
+                    app_state = APP_STATE_WAIT_FINAL_MSG;
                 }
 
                 // Proceed if RESPONSE message was sent successfully
@@ -1093,14 +1093,14 @@ int app_run_ieee_802_15_4_schedule (void)
                 if (ret != APP_SUCCESS)
                 {
                     slot_id = 3 + num_anchors;
-                    app_state = APP_STATE_WAIT_FNL_MSG;
+                    app_state = APP_STATE_WAIT_FINAL_MSG;
                 }
 
                 // Proceed if REPORT message was sent successfully
                 else if (ret == APP_SUCCESS)
                 {
                     slot_id = 3 + num_anchors;
-                    app_state = APP_STATE_WAIT_FNL_MSG;
+                    app_state = APP_STATE_WAIT_FINAL_MSG;
                 }
 
                 break;
@@ -1113,37 +1113,37 @@ int app_run_ieee_802_15_4_schedule (void)
                 if (ret != APP_SUCCESS)
                 {
                     slot_id = 3 + num_anchors;
-                    app_state = APP_STATE_WAIT_FNL_MSG;
+                    app_state = APP_STATE_WAIT_FINAL_MSG;
                 }
 
                 // Proceed if REPORT message was received
                 else if (ret == APP_SUCCESS)
                 {
                     slot_id = 3 + num_anchors;
-                    app_state = APP_STATE_WAIT_FNL_MSG;
+                    app_state = APP_STATE_WAIT_FINAL_MSG;
                 }
 
                 break;
 
-            case APP_STATE_SEND_FNL_MSG:
+            case APP_STATE_SEND_FINAL_MSG:
 
                 // Check if the node must send the FINAL message
                 if (node_type == ANCHOR && slot_id == 3 + num_anchors + anchor_id)
                 {
                     ret = app_send_final_msg();
                     slot_id++;
-                    app_state =  APP_STATE_WAIT_FNL_MSG;
+                    app_state =  APP_STATE_WAIT_FINAL_MSG;
                 }
 
                 // Listen upcoming FINAL messages otherwise
                 else
                 {
-                    app_state =  APP_STATE_WAIT_FNL_MSG;
+                    app_state =  APP_STATE_WAIT_FINAL_MSG;
                 }
 
                 break;
 
-            case APP_STATE_WAIT_FNL_MSG:
+            case APP_STATE_WAIT_FINAL_MSG:
 
                 // Check if all FINAL messages have been sent
                 if (slot_id == 3 + 2 * num_anchors)
@@ -1155,7 +1155,7 @@ int app_run_ieee_802_15_4_schedule (void)
                 // Check if the node must send the FINAL message
                 else if (node_type == ANCHOR && slot_id == 3 + num_anchors + anchor_id)
                 {
-                    app_state =  APP_STATE_SEND_FNL_MSG;
+                    app_state =  APP_STATE_SEND_FINAL_MSG;
                 }
 
                 // Listen upcoming FINAL message
@@ -1175,7 +1175,7 @@ int app_run_ieee_802_15_4_schedule (void)
 
             default:
 
-                return APP_CONFIG_ERROR;
+                return APP_RUN_ERROR;
 
                 break;
         }
@@ -1295,10 +1295,14 @@ void app_get_ranging_info (app_ranging_info_t *ranging_info)
     {
         ranging_info->anchor_mac_addr[k] = anchor_mac_addr[k];
     }
+
+    return;
 }
 
 
 void app_sleep (uint16_t time_ms)
 {
     deca_sleep(time_ms);
+
+    return;
 }

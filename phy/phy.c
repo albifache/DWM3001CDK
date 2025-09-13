@@ -224,14 +224,11 @@ static uint16_t phy_read_rx_ant_delay_from_otp (void)
 int phy_device_init (void)
 {
     // Initialize the peripherals
-    deca_sleep(5);
     deca_gpio_init();
     deca_spi_init();
-    deca_sleep(5);
 
     // Reset DW3000 IC
     deca_reset_ic();
-    deca_sleep(5);
 
     // Probe for the correct device driver
     dwt_probe((struct dwt_probe_s *)&dw3000_probe_interf);

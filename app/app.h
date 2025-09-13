@@ -21,6 +21,7 @@
 #define APP_RX_ERROR                    -1
 #define APP_SYS_ERROR                   -2
 #define APP_CONFIG_ERROR                -3
+#define APP_RUN_ERROR                   -4
 #define APP_HEADER_WARNING              2
 
 

@@ -50,18 +50,24 @@ uint64_t app_read_tx_timestamp (void)
 void app_set_delayed_trx_time (uint64_t start_time)
 {
     dwt_setdelayedtrxtime(start_time >> 8);
+
+    return;
 }
 
 
 void app_write_tx_frame_len (uint16_t tx_frame_len)
 {
     dwt_writetxfctrl(tx_frame_len, NULL_TX_BUFFER_OFFSET, RANGING_BIT_ENABLED);
+
+    return;
 }
 
 
 void app_write_tx_buffer (uint8_t tx_buffer[], uint16_t tx_frame_len)
 {
     dwt_writetxdata(tx_frame_len - FCS_LEN, tx_buffer, NULL_TX_BUFFER_OFFSET);
+
+    return;
 }
 
 
@@ -74,5 +80,6 @@ uint16_t app_read_rx_frame_len (void)
 void app_read_rx_buffer (uint8_t rx_buffer[], uint16_t rx_frame_len)
 {
     dwt_readrxdata(rx_buffer, rx_frame_len, NULL_RX_BUFFER_OFFSET);
-}
 
+    return;
+}

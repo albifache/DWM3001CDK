@@ -23,7 +23,7 @@ static bool led_state[NUM_LEDS];
 
 
 // Initialize LEDs 
-int led_gpio_init(void)
+int led_gpio_init (void)
 {
     // Initialize LEDs
     led_gpio_dev = DEVICE_DT_GET(LED_GPIO_DEV_NODE);
@@ -62,7 +62,7 @@ int led_gpio_init(void)
 
 
 // Set or reset LED
-void led_gpio_write(uint8_t led_id, bool state)
+void led_gpio_write (uint8_t led_id, bool state)
 {
     led_state[led_id] = state;
 
@@ -87,6 +87,8 @@ void led_gpio_write(uint8_t led_id, bool state)
         default:
             break;
     }
+
+    return;
 }
 
 

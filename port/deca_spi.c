@@ -24,7 +24,7 @@ static struct spi_config spi_cfg_fast;
 static struct spi_config *current_spi_cfg;
 
 
-int deca_spi_init(void)
+int deca_spi_init (void)
 {
     // Get SPI device
     spi_dev = DEVICE_DT_GET(DW_SPI_DEV_NODE);
@@ -47,7 +47,7 @@ int deca_spi_init(void)
     }
 
     // Set CS high (inactive)
-    gpio_pin_set(cs_gpio_dev, DW_CS_GPIO_PIN, 1);
+    gpio_pin_set(cs_gpio_dev, DW_CS_GPIO_PIN, true);
 
     // Configure slow SPI (2MHz)
     spi_cfg_slow.operation = SPI_WORD_SET(8) | SPI_TRANSFER_MSB;
@@ -64,19 +64,21 @@ int deca_spi_init(void)
 }
 
 
-void deca_set_spi_slow_rate(void)
+void deca_set_spi_slow_rate (void)
 {
     current_spi_cfg = &spi_cfg_slow;
 }
 
 
-void deca_set_spi_fast_rate(void)
+void deca_set_spi_fast_rate (void)
 {
     current_spi_cfg = &spi_cfg_fast;
+
+    return;
 }
 
 
-int deca_write_to_spi_with_crc(uint16_t headerLength, const uint8_t *headerBuffer, uint16_t bodyLength, const uint8_t *bodyBuffer, uint8_t crc8)
+int deca_write_to_spi_with_crc (uint16_t headerLength, const uint8_t *headerBuffer, uint16_t bodyLength, const uint8_t *bodyBuffer, uint8_t crc8)
 {
     struct spi_buf tx_bufs[3];
     struct spi_buf_set tx_buf_set;
@@ -98,17 +100,17 @@ int deca_write_to_spi_with_crc(uint16_t headerLength, const uint8_t *headerBuffe
     tx_buf_set.count = 3;
 
     // Perform SPI transaction
-    gpio_pin_set(cs_gpio_dev, DW_CS_GPIO_PIN, 0);
+    gpio_pin_set(cs_gpio_dev, DW_CS_GPIO_PIN, false);
     // k_busy_wait(1);
     ret = spi_write(spi_dev, current_spi_cfg, &tx_buf_set);
     // k_busy_wait(1);
-    gpio_pin_set(cs_gpio_dev, DW_CS_GPIO_PIN, 1);
+    gpio_pin_set(cs_gpio_dev, DW_CS_GPIO_PIN, true);
 
-    return (ret == 0) ? 0 : -1;
+    return PORT_SUCCESS;
 }
 
 
-int deca_write_to_spi(uint16_t headerLength, const uint8_t *headerBuffer, uint16_t bodyLength, const uint8_t *bodyBuffer)
+int deca_write_to_spi (uint16_t headerLength, const uint8_t *headerBuffer, uint16_t bodyLength, const uint8_t *bodyBuffer)
 {
     struct spi_buf tx_bufs[2];
     struct spi_buf_set tx_buf_set;
@@ -126,17 +128,17 @@ int deca_write_to_spi(uint16_t headerLength, const uint8_t *headerBuffer, uint16
     tx_buf_set.count = 2;
 
     // Perform SPI transaction
-    gpio_pin_set(cs_gpio_dev, DW_CS_GPIO_PIN, 0);
+    gpio_pin_set(cs_gpio_dev, DW_CS_GPIO_PIN, false);
     // k_busy_wait(1);
     ret = spi_write(spi_dev, current_spi_cfg, &tx_buf_set);
     // k_busy_wait(1);
-    gpio_pin_set(cs_gpio_dev, DW_CS_GPIO_PIN, 1);
+    gpio_pin_set(cs_gpio_dev, DW_CS_GPIO_PIN, true);
 
-    return (ret == 0) ? 0 : -1;
+    return PORT_SUCCESS;
 }
 
 
-int deca_read_from_spi(uint16_t headerLength, uint8_t *headerBuffer, uint16_t readLength, uint8_t *readBuffer)
+int deca_read_from_spi (uint16_t headerLength, uint8_t *headerBuffer, uint16_t readLength, uint8_t *readBuffer)
 {
     struct spi_buf tx_bufs[1];
     struct spi_buf_set tx_buf_set;
@@ -162,11 +164,11 @@ int deca_read_from_spi(uint16_t headerLength, uint8_t *headerBuffer, uint16_t re
     rx_buf_set.count = 2;
 
     // Perform SPI transaction
-    gpio_pin_set(cs_gpio_dev, DW_CS_GPIO_PIN, 0);
+    gpio_pin_set(cs_gpio_dev, DW_CS_GPIO_PIN, false);
     // k_busy_wait(1);
     ret = spi_transceive(spi_dev, current_spi_cfg, &tx_buf_set, &rx_buf_set);
     // k_busy_wait(1);
-    gpio_pin_set(cs_gpio_dev, DW_CS_GPIO_PIN, 1);
+    gpio_pin_set(cs_gpio_dev, DW_CS_GPIO_PIN, true);
 
-    return (ret == 0) ? 0 : -1;
+    return PORT_SUCCESS;
 }

@@ -13,11 +13,13 @@
 #define DW_RST_GPIO_DEV_NODE        DT_NODELABEL(gpio0)
 #define DW_RST_GPIO_PIN             25
 
+#define DW_RST_TIME                 5
+
 
 static const struct device *rst_gpio_dev;
 
 
-int deca_gpio_init(void)
+int deca_gpio_init (void)
 {
     rst_gpio_dev = DEVICE_DT_GET(DW_RST_GPIO_DEV_NODE);
     
@@ -37,19 +39,21 @@ int deca_gpio_init(void)
 }
 
 
-void deca_wakeup_device_with_io(void)
+void deca_wakeup_device_with_io (void)
 {
     return;
 }
 
 
-void deca_reset_ic(void)
+int deca_reset_ic (void)
 {
     // Pull RST pin low
-    gpio_pin_set(rst_gpio_dev, DW_RST_GPIO_PIN, 0);
-    k_msleep(5);
+    gpio_pin_set(rst_gpio_dev, DW_RST_GPIO_PIN, false);
+    k_msleep(DW_RST_TIME);
     
     // Relrease RST pin
-    gpio_pin_set(rst_gpio_dev, DW_RST_GPIO_PIN, 1);
-    k_msleep(5);
+    gpio_pin_set(rst_gpio_dev, DW_RST_GPIO_PIN, true);
+    k_msleep(DW_RST_TIME);
+
+    return PORT_SUCCESS;
 }
