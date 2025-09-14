@@ -1,5 +1,0 @@
-west:
-  command: /home/alberto/zephyrproject/.venv/bin/west build -b decawave_dwm3001cdk
-    -d build
-  topdir: /home/alberto/zephyrproject
-  version: 1.3.0
