@@ -28,7 +28,7 @@
 #define ALERT_DIST                      1.0f                // Alert distance (m)
 
 
-static uint16_t my_mac_addr = 0x07;
+static uint16_t my_mac_addr = 0x00;
 static uint16_t my_pan_id = 0x00;
 
 static uint16_t tag_mac_addr = PAN_COORDINATOR_MAC_ADDR;

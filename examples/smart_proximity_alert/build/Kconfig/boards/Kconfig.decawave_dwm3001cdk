@@ -1,0 +1,2 @@
+# Load board Kconfig descriptions.
+osource "/home/alberto/zephyrproject/zephyr/boards/qorvo/decawave_dwm3001cdk/Kconfig.decawave_dwm3001cdk"

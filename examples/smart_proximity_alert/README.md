@@ -6,7 +6,7 @@ This project is distributed under the **GNU AGPL v3.0 License** (Check [LICENSE]
 
 ## Overview
 
-This example implements a smart proximity sensor where 1 tag equipped with 4 LEDs ranges up to 4 anchor nodes and blinks the LEDs associated to the anchor nodes whose distance from the tag is below a certain threshold. For this example you will need 2 to 5 DWM3001CDK modules.
+This example implements a smart proximity sensor where 1 tag equipped with 4 LEDs ranges up to 4 anchor nodes and blinks the LEDs associated to the anchor nodes whose distance from the tag is below a certain threshold. For this example you will need 2 to 5 DWM3001CDK modules. The code might contain some small inefficiencies since it is designed to be as readable and educational as possible.
 
 ## Building and Flashing
 

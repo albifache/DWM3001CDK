@@ -27,5 +27,5 @@ const struct dwt_probe_s dw3000_probe_interf =
     .spi = (void*)&dw3000_spi_fct,
     .wakeup_device_with_io = deca_wakeup_device_with_io,
     .driver_list = (struct dwt_driver_s **)tmp_ptr,
-    .dw_driver_num = 2,
+    .dw_driver_num = 1,
 };
