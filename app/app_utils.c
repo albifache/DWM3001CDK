@@ -13,6 +13,7 @@
 #define NULL_RX_BUFFER_OFFSET               0                                       
 #define NULL_TX_BUFFER_OFFSET               0
 #define RANGING_BIT_ENABLED                 1
+#define RX_TIMEOUT_OFFSET                   16
 
 
 uint64_t app_read_rx_timestamp (void)
@@ -82,4 +83,10 @@ void app_read_rx_buffer (uint8_t rx_buffer[], uint16_t rx_frame_len)
     dwt_readrxdata(rx_buffer, rx_frame_len, NULL_RX_BUFFER_OFFSET);
 
     return;
+}
+
+
+void app_set_rx_timeout (uint64_t rx_timeout)
+{
+    dwt_setrxtimeout(rx_timeout >> RX_TIMEOUT_OFFSET);
 }

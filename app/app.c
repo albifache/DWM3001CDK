@@ -30,11 +30,14 @@
                                         SYS_STATUS_HI_SPI_OVF_BIT_MASK | \
                                         SYS_STATUS_HI_SPI_UNF_BIT_MASK | \
                                         SYS_STATUS_HI_SPIERR_BIT_MASK)
+                                      
+#define RX_TIMEOUT_DISABLED             0  
+#define DEFAULT_RX_TIMEOUT              ((uint64_t) (3.0f * 0.001f / DWT_TIME_UNITS))       // RX timeout (3 ms)
+#define SLOT_TIME                       ((uint64_t) (5.0f * 0.001f / DWT_TIME_UNITS))       // Slot duration (5 ms)
 
-#define RX_TIMEOUT_DISABLED             0
-#define DEFAULT_RX_TIMEOUT              2925u               // RX timeout (3 ms)
-#define SLOT_TIME                       319488000ull        // Slot duration (5 ms)
-#define DELAY_BEFORE_RX                 223641600ull        // Wait time before enabling receiver after start of slot (3.5 ms)
+#define RX_GUARD_TIME                   ((uint64_t) (1.5f * 0.001f / DWT_TIME_UNITS))       // Guard time to switch on receiver
+                                                                                            // before beginning of slot (1.5 ms)
+#define DELAY_BEFORE_RX                 (SLOT_TIME - RX_GUARD_TIME)
 
 #define CLOCK_CYCLE                     0x010000000000ull
 #define CLOCK_FINE_MASK                 0xFFFFFFFFull
@@ -327,7 +330,7 @@ static int app_send_init_msg (void)
 static int app_wait_init_msg (void)
 {
     // Disable RX timeout
-    dwt_setrxtimeout(RX_TIMEOUT_DISABLED);
+    app_set_rx_timeout(RX_TIMEOUT_DISABLED);
 
     // Start receiving (immediate)
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
@@ -463,7 +466,7 @@ static int app_send_rqst_msg (void)
 static int app_wait_rqst_msg (void)
 {
     // Enable RX timeout
-    dwt_setrxtimeout(DEFAULT_RX_TIMEOUT);
+    app_set_rx_timeout(DEFAULT_RX_TIMEOUT);
 
     // Set timestamp to switch on the receiver
     app_set_delayed_trx_time(ts_rx_init + (slot_id - 1) * SLOT_TIME + DELAY_BEFORE_RX);
@@ -562,7 +565,7 @@ static int app_send_resp_msg (void)
 static int app_wait_resp_msg (void)
 {
     // Enable RX timeout
-    dwt_setrxtimeout(DEFAULT_RX_TIMEOUT);
+    app_set_rx_timeout(DEFAULT_RX_TIMEOUT);
 
     // Set timestamp to switch on the receiver
     app_set_delayed_trx_time(ts_rx_init + (slot_id - 1) * SLOT_TIME + DELAY_BEFORE_RX);
@@ -687,7 +690,7 @@ static int app_send_report_msg (void)
 static int app_wait_report_msg (void)
 {
     // Enable RX timeout
-    dwt_setrxtimeout(DEFAULT_RX_TIMEOUT);
+    app_set_rx_timeout(DEFAULT_RX_TIMEOUT);
 
     // Set timestamp to switch on the receiver
     app_set_delayed_trx_time(ts_rx_init + (slot_id - 1) * SLOT_TIME + DELAY_BEFORE_RX);
@@ -824,7 +827,7 @@ static int app_send_final_msg (void)
 static int app_wait_final_msg (void)
 {
     // Enable RX timeout
-    dwt_setrxtimeout(DEFAULT_RX_TIMEOUT);
+    app_set_rx_timeout(DEFAULT_RX_TIMEOUT);
 
     // Set timestamp to switch on receiver
     app_set_delayed_trx_time(ts_rx_init + (slot_id - 1) * SLOT_TIME + DELAY_BEFORE_RX);

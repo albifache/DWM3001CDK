@@ -32,4 +32,7 @@ uint16_t app_read_rx_frame_len (void);
 void app_read_rx_buffer (uint8_t rx_buffer[], uint16_t rx_frame_len);
 
 
+void app_set_rx_timeout (uint64_t rx_timeout);
+
+
 #endif
