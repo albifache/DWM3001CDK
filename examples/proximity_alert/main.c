@@ -11,6 +11,7 @@
 #include "../../phy/phy.h"
 #include "../../port/port.h"   
 #include <stdio.h>
+#include <zephyr/sys/printk.h>
 
 
 #define PRECAL_TX_POWER                 0
@@ -19,7 +20,7 @@
 #define BLUE_LED                        3
 #define RED_LED                         1
 
-#define GUARD_TIME                      5                   // Guard time (ms)
+#define GUARD_TIME                      10                  // Guard time (ms)
 #define SLEEP_TIME                      100                 // Sleeping time (ms)
 #define BLINK_TIME                      100                 // LED blinking time (ms)
 
@@ -28,15 +29,15 @@
 #define ALERT_DIST                      1.0f                // Alert distance (m)
 
 
-static uint16_t my_mac_addr = 0x00;
+static uint16_t my_mac_addr = 0x07;
 static uint16_t my_pan_id = 0x00;
 
-static uint16_t tag_mac_addr = PAN_COORDINATOR_MAC_ADDR;
+//static uint16_t tag_mac_addr = PAN_COORDINATOR_MAC_ADDR;
 static uint16_t anchor_mac_addr[] = {0x06, 0x07};
 static uint8_t num_anchors = sizeof(anchor_mac_addr) / sizeof(uint16_t);
 
 static uint8_t led_id[] = {BLUE_LED, RED_LED};
-static bool led_state[] = {false, false};
+static volatile bool led_state[] = {false, false};
 
 static app_ranging_info_t ranging_info;
 static float dist[NUM_LEDS];
@@ -66,40 +67,75 @@ int main (void)
     int ret;
 
     // Initialize LEDs
-    led_gpio_init();
+    ret = led_gpio_init();
+    if (ret != PORT_SUCCESS)
+    {
+        printk("\nLEDs initialization failed.\n");
+        while(1);
+    }
+    else
+    {
+        printk("\nLEDs initialization successful.\n");
+    }
 
     // Initialize DW3000 IC
     ret = phy_device_init();
-    if (ret != PHY_SUCCESS) while(1);
+    if (ret != PHY_SUCCESS)
+    {
+        printk("\nDW3000 initialization failed.\n");
+        while(1);
+    }
+    else
+    {
+        printk("\nDW3000 initialization successful.\n");
+    }
 
     // Configure DW3000 IC
     ret = phy_set_config(&config);
-    if (ret != PHY_SUCCESS) while(1);
+    if (ret != PHY_SUCCESS)
+    {
+        printk("\nDW3000 configuration failed.\n");
+        while(1);
+    }
+    else
+    {
+        printk("\nDW3000 configuration successful.\n");
+    }
 
     // Set TX power
-    ret = phy_set_tx_power(tx_power);
+    phy_set_tx_power(tx_power);
     
     // Set antenna delay
-    ret = phy_set_ant_delay(ant_delay);
+    phy_set_ant_delay(ant_delay);
+
+    // Check MAC errors
+    if (num_anchors > NUM_LEDS || my_mac_addr == BROADCAST_MAC_ADDR || my_pan_id == BROADCAST_PAN_ID)
+    {
+        //printk("\nMAC configuration error.\n");
+        while(1);
+    }
+    else
+    {
+        //printk("\nMAC configuration successful.\n");
+    }
 
     // set MAC address
-    ret = app_set_mac_addr(my_mac_addr);
+    app_set_mac_addr(my_mac_addr);
 
     // set PAN ID
-    ret = app_set_pan_id(my_pan_id);
+    app_set_pan_id(my_pan_id);
 
     // set tag MAC address
-    app_set_tag_mac_addr(tag_mac_addr);
+    app_set_tag_mac_addr(PAN_COORDINATOR_MAC_ADDR);
 
     // Set anchors MAC addresses
-    if (num_anchors > NUM_LEDS) while(1);
     app_set_anchor_mac_addr(anchor_mac_addr, num_anchors);
 
     // Begin loop
     while (1)
     {
         // Wait a bit before proceeding to make sure anchors have receiver switched on
-        if (my_mac_addr == tag_mac_addr)
+        if (my_mac_addr == PAN_COORDINATOR_MAC_ADDR)
         {
             app_sleep(GUARD_TIME);
         }
@@ -119,7 +155,7 @@ int main (void)
         // Set LEDs states if tag is too close to the anchors
         for (int k = 0; k < num_anchors; k++)
         {
-            if (dist[k] < ALERT_DIST && dist[k] > 0 && my_mac_addr == tag_mac_addr)
+            if (dist[k] < ALERT_DIST && dist[k] > 0 && my_mac_addr == PAN_COORDINATOR_MAC_ADDR)
             {
                 led_state[k] = true;
             }

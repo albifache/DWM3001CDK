@@ -25,11 +25,11 @@ void mac_header_write (mac_header_t* mac_header, uint8_t tx_buffer[])
 
 void mac_header_read (mac_header_t* mac_header, uint8_t rx_buffer[])
 {
-    mac_header->frame_ctrl = ((uint16_t)rx_buffer[0]) | (((uint16_t)rx_buffer[1]) << 8);
+    mac_header->frame_ctrl = ((uint16_t) rx_buffer[0]) | (((uint16_t) rx_buffer[1]) << 8);
     mac_header->frame_seq_num = rx_buffer[2];
-    mac_header->pan_id = ((uint16_t)rx_buffer[3]) | (((uint16_t)rx_buffer[4]) << 8);
-    mac_header->dest_addr = ((uint16_t)rx_buffer[5]) | (((uint16_t)rx_buffer[6]) << 8);
-    mac_header->src_addr = ((uint16_t)rx_buffer[7]) | (((uint16_t)rx_buffer[8]) << 8);
+    mac_header->pan_id = ((uint16_t) rx_buffer[3]) | (((uint16_t) rx_buffer[4]) << 8);
+    mac_header->dest_addr = ((uint16_t) rx_buffer[5]) | (((uint16_t) rx_buffer[6]) << 8);
+    mac_header->src_addr = ((uint16_t) rx_buffer[7]) | (((uint16_t) rx_buffer[8]) << 8);
 
     return;
 }

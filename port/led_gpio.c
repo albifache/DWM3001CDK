@@ -19,7 +19,7 @@
 
 
 static const struct device *led_gpio_dev;
-static bool led_state[NUM_LEDS];
+static volatile bool led_state[NUM_LEDS];
 
 
 // Initialize LEDs 
@@ -32,20 +32,26 @@ int led_gpio_init (void)
         return PORT_INIT_ERROR;
     }
 
-    // Configure LEDs
+    // Configure LED 0
     if (gpio_pin_configure(led_gpio_dev, LED_0_GPIO_PIN, GPIO_OUTPUT) != 0)
     {
         return PORT_CONFIG_ERROR;
     }
-    if (gpio_pin_configure(led_gpio_dev, LED_3_GPIO_PIN, GPIO_OUTPUT) != 0)
-    {
-        return PORT_CONFIG_ERROR;
-    }
+    
+    // Configure LED 1
     if (gpio_pin_configure(led_gpio_dev, LED_1_GPIO_PIN, GPIO_OUTPUT) != 0)
     {
         return PORT_CONFIG_ERROR;
     }
+
+    // Configure LED 2
     if (gpio_pin_configure(led_gpio_dev, LED_2_GPIO_PIN, GPIO_OUTPUT) != 0)
+    {
+        return PORT_CONFIG_ERROR;
+    }
+
+    // Configure LED 3
+    if (gpio_pin_configure(led_gpio_dev, LED_3_GPIO_PIN, GPIO_OUTPUT) != 0)
     {
         return PORT_CONFIG_ERROR;
     }
@@ -54,7 +60,7 @@ int led_gpio_init (void)
     for (int k = 0; k < NUM_LEDS; k++)
     {
         led_state[k] = false;
-        led_gpio_write(k, false);
+        led_gpio_write(k, led_state[k]);
     }
     
     return PORT_SUCCESS;
@@ -70,22 +76,22 @@ void led_gpio_write (uint8_t led_id, bool state)
     {
         case 0:
             gpio_pin_set(led_gpio_dev, LED_0_GPIO_PIN, !state);
-            break;
+        break;
 
         case 1:
             gpio_pin_set(led_gpio_dev, LED_1_GPIO_PIN, !state);
-            break;
+        break;
 
         case 2:
             gpio_pin_set(led_gpio_dev, LED_2_GPIO_PIN, !state);
-            break;
+        break;
 
         case 3:
             gpio_pin_set(led_gpio_dev, LED_3_GPIO_PIN, !state);
-            break;
+        break;
 
         default:
-            break;
+        break;
     }
 
     return;

@@ -297,61 +297,61 @@ int phy_set_config (dwt_config_t* new_config)
             tx_pr_len = 32;
             pac_size = 4;
             config.rxPAC = DWT_PAC4;
-            break;
+        break;
 
         case DWT_PLEN_64:
             tx_pr_len = 64;
             pac_size = 4;
             config.rxPAC = DWT_PAC4;
-            break;
+        break;
 
         case DWT_PLEN_72:
             tx_pr_len = 72;
             pac_size = 4;
             config.rxPAC = DWT_PAC4;
-            break;
+        break;
 
         case DWT_PLEN_128:
             tx_pr_len = 128;
             pac_size = 8;
             config.rxPAC = DWT_PAC8;
-            break;
+        break;
 
         case DWT_PLEN_256:
             tx_pr_len = 256;
             pac_size = 16;
             config.rxPAC = DWT_PAC16;
-            break;
+        break;
 
         case DWT_PLEN_512:
             tx_pr_len = 512;
             pac_size = 32;
             config.rxPAC = DWT_PAC32;
-            break;
+        break;
 
         case DWT_PLEN_1024:
             tx_pr_len = 1024;
             pac_size = 32;
             config.rxPAC = DWT_PAC32;
-            break;
+        break;
 
         case DWT_PLEN_1536:
             tx_pr_len = 1536;
             pac_size = 32;
             config.rxPAC = DWT_PAC32;
-            break;
+        break;
 
         case DWT_PLEN_2048:
             tx_pr_len = 2048;
             pac_size = 32;
             config.rxPAC = DWT_PAC32;
-            break;
+        break;
 
         case DWT_PLEN_4096:
             tx_pr_len = 4096;
             pac_size = 32;
             config.rxPAC = DWT_PAC32;
-            break;
+        break;
     }
 
     // Set SFD timeout

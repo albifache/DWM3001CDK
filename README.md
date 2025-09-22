@@ -75,12 +75,18 @@ DWM3001CDK/
 │
 ├── examples/
 │   │
-│   └── smart_proximity_alert/              # Smart proximity alert example
+│   ├── proximity_alert/                    # Proximity alert example
+│   │   ├── main.c                          # Main file
+│   │   ├── CMakeLists.txt                  # Build configuration
+│   │   ├── prj.conf                        # Zephyr project configuration
+│   │   └── README.md                       # Proximity alert documentation
+│   │
+│   └── multi_node_ranging/                 # Multi-node ranging example
 │       ├── main.c                          # Main file
 │       ├── CMakeLists.txt                  # Build configuration
 │       ├── prj.conf                        # Zephyr project configuration
-│       └── README.md                       # Smart proximity alert documentation
-│
+│       └── README.md                       # Multi-node ranging documentation
+│   
 ├── README.md                               # Documentation
 └── LICENSE                                 # License (GNU AGPL v3.0)
 ```

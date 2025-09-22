@@ -8,7 +8,7 @@
 #include "app_utils.h"
 #include "../mac/mac.h"
 #include "../deca_driver/deca_device_api.h"
-#include "../port/port.h"  
+#include "../port/port.h"
 
 
 #define SYS_STATUS_RX_ERROR             (SYS_STATUS_RXPHE_BIT_MASK | \
@@ -166,13 +166,13 @@ static void app_header_read (app_header_t* app_header, uint8_t rx_buffer[])
 
     // Read message type from RX buffer
     app_header->msg_type = (uint16_t) rx_buffer[MAC_HEADER_LEN + 2];
-    app_header->msg_type |= ((uint16_t)rx_buffer[MAC_HEADER_LEN + 3]) << 8;
+    app_header->msg_type |= ((uint16_t) rx_buffer[MAC_HEADER_LEN + 3]) << 8;
 
     // Read superframe ID from RX buffer
     app_header->superframe_id = (uint32_t) rx_buffer[MAC_HEADER_LEN + 4];
-    app_header->superframe_id |= ((uint32_t)rx_buffer[MAC_HEADER_LEN + 5]) << 8;
-    app_header->superframe_id |= ((uint32_t)rx_buffer[MAC_HEADER_LEN + 6]) << 16;
-    app_header->superframe_id |= ((uint32_t)rx_buffer[MAC_HEADER_LEN + 7]) << 24;
+    app_header->superframe_id |= ((uint32_t) rx_buffer[MAC_HEADER_LEN + 5]) << 8;
+    app_header->superframe_id |= ((uint32_t) rx_buffer[MAC_HEADER_LEN + 6]) << 16;
+    app_header->superframe_id |= ((uint32_t) rx_buffer[MAC_HEADER_LEN + 7]) << 24;
 
     return;
 }
@@ -180,10 +180,13 @@ static void app_header_read (app_header_t* app_header, uint8_t rx_buffer[])
 
 static int app_wait_tx_done (void)
 {
+    volatile uint32_t sysstatuslo = dwt_readsysstatuslo();
+    volatile uint32_t sysstatushi = dwt_readsysstatushi();
+
     while (1)
     {
-        uint32_t sysstatuslo = dwt_readsysstatuslo();
-        uint32_t sysstatushi = dwt_readsysstatushi();
+        sysstatuslo = dwt_readsysstatuslo();
+        sysstatushi = dwt_readsysstatushi();
         
         // Check if transmission is successfully completed
         if (sysstatuslo & SYS_STATUS_TXFRS_BIT_MASK)
@@ -211,10 +214,13 @@ static int app_wait_tx_done (void)
 
 static int app_wait_rx_done (void)
 {
+    volatile uint32_t sysstatuslo;
+    volatile uint32_t sysstatushi;
+
     while (1)
     {
-        uint32_t sysstatuslo = dwt_readsysstatuslo();
-        uint32_t sysstatushi = dwt_readsysstatushi();
+        sysstatuslo = dwt_readsysstatuslo();
+        sysstatushi = dwt_readsysstatushi();
 
         // Check if reception is successfully completed
         if ((sysstatuslo & SYS_STATUS_RXFCG_BIT_MASK) && (sysstatuslo & SYS_STATUS_CIADONE_BIT_MASK))
@@ -377,15 +383,15 @@ static int app_wait_init_msg (void)
     num_anchors = rx_buffer[HEADER_LEN];
 
     // Read tag MAC address
-    tag_mac_addr = (uint16_t)rx_buffer[HEADER_LEN + 1];
-    tag_mac_addr |= ((uint16_t)rx_buffer[HEADER_LEN + 2]) << 8;
+    tag_mac_addr = (uint16_t) rx_buffer[HEADER_LEN + 1];
+    tag_mac_addr |= ((uint16_t) rx_buffer[HEADER_LEN + 2]) << 8;
     
 
     // Read anchors MAC addresses
     for (int n = 0; n < num_anchors; n++)
     {
-        anchor_mac_addr[n] = (uint16_t)rx_buffer[HEADER_LEN + 3 + 2 * n];
-        anchor_mac_addr[n] |= ((uint16_t)rx_buffer[HEADER_LEN + 4 + 2 * n]) << 8;
+        anchor_mac_addr[n] = (uint16_t) rx_buffer[HEADER_LEN + 3 + 2 * n];
+        anchor_mac_addr[n] |= ((uint16_t) rx_buffer[HEADER_LEN + 4 + 2 * n]) << 8;
     }
 
     // Check if the node has been selected as tag
@@ -928,7 +934,7 @@ int app_run_ieee_802_15_4_schedule (void)
                     app_state = APP_STATE_WAIT_INIT_MSG;
                 }
 
-                break;
+            break;
 
             case APP_STATE_SEND_INIT_MSG:
 
@@ -943,31 +949,34 @@ int app_run_ieee_802_15_4_schedule (void)
                 }
 
                 // Check if transmission was successful
-                else if (ret == APP_SUCCESS)
+                else
                 {
-                    // Check if node was selected as listener
-                    if (node_type == LISTENER)
+                    switch (node_type)
                     {
-                        slot_id = 3 + num_anchors;
-                        app_state = APP_STATE_WAIT_FINAL_MSG;
-                    }
+                        case LISTENER:
 
-                    // Check if node was selected as tag
-                    else if (node_type == TAG)
-                    {
-                        slot_id = 1;
-                        app_state = APP_STATE_SEND_RQST_MSG;
-                    }
+                            slot_id = 3 + num_anchors;
+                            app_state = APP_STATE_WAIT_FINAL_MSG;
 
-                    // Check if node was selected as anchor
-                    else if (node_type == ANCHOR)
-                    {
-                        slot_id = 1;
-                        app_state = APP_STATE_WAIT_RQST_MSG;
+                        break;
+                        
+                        case TAG:
+
+                            slot_id = 1;
+                            app_state = APP_STATE_SEND_RQST_MSG;
+
+                        break;
+
+                        case ANCHOR:
+
+                            slot_id = 1;
+                            app_state = APP_STATE_WAIT_RQST_MSG;
+
+                        break;
                     }
                 }
 
-                break;
+            break;
             
             case APP_STATE_WAIT_INIT_MSG:
 
@@ -981,31 +990,34 @@ int app_run_ieee_802_15_4_schedule (void)
                 }
 
                 // Check if transmission was successful
-                else if (ret == APP_SUCCESS)
+                else
                 {
-                    // Check if node was selected as listener
-                    if (node_type == LISTENER)
+                    switch (node_type)
                     {
-                        slot_id = 3 + num_anchors;
-                        app_state = APP_STATE_WAIT_FINAL_MSG;
-                    }
+                        case LISTENER:
 
-                    // Check if node was selected as tag
-                    else if (node_type == TAG)
-                    {
-                        slot_id = 1;
-                        app_state = APP_STATE_SEND_RQST_MSG;
-                    }
+                            slot_id = 3 + num_anchors;
+                            app_state = APP_STATE_WAIT_FINAL_MSG;
 
-                    // Check if node was selected as anchor
-                    else if (node_type == ANCHOR)
-                    {
-                        slot_id = 1;
-                        app_state = APP_STATE_WAIT_RQST_MSG;
+                        break;
+                        
+                        case TAG:
+
+                            slot_id = 1;
+                            app_state = APP_STATE_SEND_RQST_MSG;
+
+                        break;
+
+                        case ANCHOR:
+
+                            slot_id = 1;
+                            app_state = APP_STATE_WAIT_RQST_MSG;
+
+                        break;
                     }
                 }
 
-                break;
+            break;
 
             case APP_STATE_SEND_RQST_MSG:
 
@@ -1019,13 +1031,13 @@ int app_run_ieee_802_15_4_schedule (void)
                 }
 
                 // Proceed if REQUEST message is successfully sent
-                else if (ret == APP_SUCCESS)
+                else
                 {
                     slot_id = 2;
                     app_state = APP_STATE_WAIT_RESP_MSG;
                 }
 
-                break;
+            break;
 
             case APP_STATE_WAIT_RQST_MSG:
                 
@@ -1039,13 +1051,13 @@ int app_run_ieee_802_15_4_schedule (void)
                 }
 
                 // Proceed if REQUEST message is received
-                else if (ret == APP_SUCCESS)
+                else
                 {
                     slot_id = 2 + anchor_id;                    
                     app_state = APP_STATE_SEND_RESP_MSG;
                 }
 
-                break;
+            break;
 
             case APP_STATE_SEND_RESP_MSG:
 
@@ -1059,13 +1071,13 @@ int app_run_ieee_802_15_4_schedule (void)
                 }
 
                 // Proceed if RESPONSE message was sent successfully
-                else if (ret == APP_SUCCESS)
+                else
                 {
                     slot_id = 2 + num_anchors;
                     app_state = APP_STATE_WAIT_RPT_MSG;
                 }
 
-                break;
+            break;
 
             case APP_STATE_WAIT_RESP_MSG:
 
@@ -1086,47 +1098,27 @@ int app_run_ieee_802_15_4_schedule (void)
                     app_state = APP_STATE_SEND_RPT_MSG;
                 }
 
-                break;
+            break;
 
             case APP_STATE_SEND_RPT_MSG:
 
                 ret = app_send_report_msg();
 
-                // Exit if REPORT message was not sent successfully
-                if (ret != APP_SUCCESS)
-                {
-                    slot_id = 3 + num_anchors;
-                    app_state = APP_STATE_WAIT_FINAL_MSG;
-                }
+                // Go to FINAL message
+                slot_id = 3 + num_anchors;
+                app_state = APP_STATE_WAIT_FINAL_MSG;
 
-                // Proceed if REPORT message was sent successfully
-                else if (ret == APP_SUCCESS)
-                {
-                    slot_id = 3 + num_anchors;
-                    app_state = APP_STATE_WAIT_FINAL_MSG;
-                }
-
-                break;
+            break;
 
             case APP_STATE_WAIT_RPT_MSG:
 
                 ret = app_wait_report_msg();
 
-                // Exit if REPORT message was not received
-                if (ret != APP_SUCCESS)
-                {
-                    slot_id = 3 + num_anchors;
-                    app_state = APP_STATE_WAIT_FINAL_MSG;
-                }
+                // Go to FINAL message
+                slot_id = 3 + num_anchors;
+                app_state = APP_STATE_WAIT_FINAL_MSG;
 
-                // Proceed if REPORT message was received
-                else if (ret == APP_SUCCESS)
-                {
-                    slot_id = 3 + num_anchors;
-                    app_state = APP_STATE_WAIT_FINAL_MSG;
-                }
-
-                break;
+            break;
 
             case APP_STATE_SEND_FINAL_MSG:
 
@@ -1144,7 +1136,7 @@ int app_run_ieee_802_15_4_schedule (void)
                     app_state =  APP_STATE_WAIT_FINAL_MSG;
                 }
 
-                break;
+            break;
 
             case APP_STATE_WAIT_FINAL_MSG:
 
@@ -1168,19 +1160,19 @@ int app_run_ieee_802_15_4_schedule (void)
                     slot_id++;
                 }
 
-                break;
+            break;
 
             case APP_STATE_END:
                 
                 return ret;
 
-                break;
+            break;
 
             default:
 
                 return APP_RUN_ERROR;
 
-                break;
+            break;
         }
     }
 }
