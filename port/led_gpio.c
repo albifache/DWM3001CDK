@@ -35,25 +35,25 @@ int led_gpio_init (void)
     // Configure LED 0
     if (gpio_pin_configure(led_gpio_dev, LED_0_GPIO_PIN, GPIO_OUTPUT) != 0)
     {
-        return PORT_CONFIG_ERROR;
+        return PORT_INIT_ERROR;
     }
     
     // Configure LED 1
     if (gpio_pin_configure(led_gpio_dev, LED_1_GPIO_PIN, GPIO_OUTPUT) != 0)
     {
-        return PORT_CONFIG_ERROR;
+        return PORT_INIT_ERROR;
     }
 
     // Configure LED 2
     if (gpio_pin_configure(led_gpio_dev, LED_2_GPIO_PIN, GPIO_OUTPUT) != 0)
     {
-        return PORT_CONFIG_ERROR;
+        return PORT_INIT_ERROR;
     }
 
     // Configure LED 3
     if (gpio_pin_configure(led_gpio_dev, LED_3_GPIO_PIN, GPIO_OUTPUT) != 0)
     {
-        return PORT_CONFIG_ERROR;
+        return PORT_INIT_ERROR;
     }
 
     // Switch off LEDs

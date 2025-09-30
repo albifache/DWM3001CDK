@@ -15,7 +15,30 @@
 
 #define PORT_SUCCESS                    0
 #define PORT_INIT_ERROR                 -1
-#define PORT_CONFIG_ERROR               -2
+#define PORT_RUN_ERROR                  -2
+
+
+typedef struct
+{
+    uint32_t device_id;
+    uint32_t chip_id;
+    uint64_t lot_id;
+    uint8_t otp_rev;
+    uint8_t xtal_trim;
+    uint16_t rx_antd_ch5_prf16;
+    uint16_t rx_antd_ch5_prf64;
+    uint16_t rx_antd_ch9_prf16;
+    uint16_t rx_antd_ch9_prf64;
+    uint16_t tx_antd_ch5_prf16;
+    uint16_t tx_antd_ch5_prf64;
+    uint16_t tx_antd_ch9_prf16;
+    uint16_t tx_antd_ch9_prf64;
+    uint32_t tx_power_ch5_prf16;
+    uint32_t tx_power_ch5_prf64;
+    uint32_t tx_power_ch9_prf16;
+    uint32_t tx_power_ch9_prf64;
+}
+deca_hw_info_t;
 
 
 // Initialize the DW3000 RST pin 
@@ -78,8 +101,20 @@ int led_gpio_init (void);
 void led_gpio_write (uint8_t led_id, bool state);
 
 
-// Set or reset LED
+// Read LEDs state
 bool led_gpio_read (uint8_t led_id);
+
+
+// Initialize DW3000 IC
+int deca_init (void);
+
+
+// Check if DW3000 IC has been initialized
+bool deca_init_check (void);
+
+
+// Read DW3000 IC hardcoded info
+void deca_read_device_info (deca_hw_info_t *info);
 
 
 #endif

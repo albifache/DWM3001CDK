@@ -13,33 +13,21 @@
 
 #define PHY_SUCCESS                             0
 #define PHY_INIT_ERROR                          -1
-#define PHY_CONFIG_ERROR                        -2
-#define PHY_CONFIG_WARNING                      1
+#define PHY_INIT_WARNING                        1
 
 
 typedef struct
 {
-    uint32_t dev_id;
-    uint32_t chip_id;
-    uint64_t lot_id;
-    uint8_t otp_rev;
+    dwt_pll_ch_type_e rf_chan;
+    uint8_t preamble_code;
+    uint16_t preamble_len;
+    dwt_uwb_bit_rate_e bit_rate;
+    dwt_sts_lengths_e sts_len;
 }
-phy_device_info_t;
+phy_init_obj_t;
 
 
-void phy_get_device_info (phy_device_info_t* device_info);
-
-
-int phy_device_init (void);
-
-
-int phy_set_config (dwt_config_t* config);
-
-
-int phy_set_ant_delay (uint16_t ant_delay);
-
-
-int phy_set_tx_power (uint32_t tx_power);
+int phy_init (phy_init_obj_t *obj);
 
 
 #endif

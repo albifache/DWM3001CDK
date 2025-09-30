@@ -9,6 +9,7 @@
 #include "../mac/mac.h"
 #include "../deca_driver/deca_device_api.h"
 #include "../port/port.h"
+//#include <zephyr/sys/printk.h>
 
 
 #define SYS_STATUS_RX_ERROR             (SYS_STATUS_RXPHE_BIT_MASK | \
@@ -32,20 +33,28 @@
                                         SYS_STATUS_HI_SPIERR_BIT_MASK)
                                       
 #define RX_TIMEOUT_DISABLED             0  
-#define DEFAULT_RX_TIMEOUT              ((uint64_t) (3.0f * 0.001f / DWT_TIME_UNITS))       // RX timeout (3 ms)
-#define SLOT_TIME                       ((uint64_t) (5.0f * 0.001f / DWT_TIME_UNITS))       // Slot duration (5 ms)
+#define DEFAULT_RX_TIMEOUT              ((uint64_t) (3.0f * 0.001f / DWT_TIME_UNITS))       // RX timeout (ms)
+#define SLOT_TIME                       ((uint64_t) (6.0f * 0.001f / DWT_TIME_UNITS))       // Slot duration (ms)
 
-#define RX_GUARD_TIME                   ((uint64_t) (1.5f * 0.001f / DWT_TIME_UNITS))       // Guard time to switch on receiver
-                                                                                            // before beginning of slot (1.5 ms)
+#define RX_GUARD_TIME                   ((uint64_t) (1.25f * 0.001f / DWT_TIME_UNITS))      // Guard time (ms) to switch on RX
+                                                                                            // before beginning of slot
 #define DELAY_BEFORE_RX                 (SLOT_TIME - RX_GUARD_TIME)
+#define TRX_POLL_TIME                   50                                                  // Polling time (us) when waiting
+                                                                                            // for TRX operation completion
 
 #define CLOCK_CYCLE                     0x010000000000ull
 #define CLOCK_FINE_MASK                 0xFFFFFFFFull
 #define CLOCK_COARSE_MASK               0xFFFFFFFE00ull
 
-#define APP_VERSION                     0
-#define APP_HEADER_LEN                  8
+#define APP_VERSION                     1
+
+#define APP_HEADER_LEN                  13
 #define HEADER_LEN                      (MAC_HEADER_LEN + APP_HEADER_LEN)
+#define MIC_LEN                         16
+
+#define NULL_RX_BUFFER_OFFSET           0
+#define NULL_TX_BUFFER_OFFSET           0
+#define RANGING_BIT_ENABLED             1
 
 
 typedef enum
@@ -65,7 +74,7 @@ typedef enum
     TAG = 1,
     ANCHOR = 2
 }
-app_node_type_e;
+node_type_e;
 
 
 typedef enum
@@ -90,26 +99,32 @@ typedef struct
 {
     uint16_t version;
     app_msg_type_e msg_type;
-    uint32_t superframe_id;
+    uint64_t superframe_id;
+    uint8_t slot_id;
 }
 app_header_t;
 
 
-static uint16_t my_pan_id = 0U;
-static uint16_t my_mac_addr = 0U;
-static uint8_t frame_seq_num = 0;
+// Initialization parameters
+static uint16_t mac_addr;
+static uint16_t pan_id;
+static dwt_sts_cp_key_t sts_key;
+static dwt_aes_key_t aes_key;
 
+// Public logic control variables (user defined)
 static uint16_t tag_mac_addr;
-static uint16_t anchor_mac_addr[MAX_NUM_ANCHORS];
-static uint32_t superframe_id = 0UL;
-static app_node_type_e node_type = LISTENER;
 static uint8_t num_anchors = MAX_NUM_ANCHORS;
+static uint16_t anchor_mac_addr[MAX_NUM_ANCHORS];
+
+// Internal logic control variables
+static node_type_e node_type = LISTENER;
+static app_state_e app_state;
+static uint8_t frame_seq_num = 0;
+static uint64_t superframe_id = 0;
+static uint8_t slot_id = 0;
 static uint8_t anchor_id = 0;
 
-static uint8_t slot_id = 0;
-static app_state_e app_state;
-
-static uint64_t ts_tx_init;
+// Timestamps
 static uint64_t ts_rx_init;
 static uint64_t ts_tx_rqst;
 static uint64_t ts_rx_rqst;
@@ -119,13 +134,18 @@ static uint64_t ts_tx_rpt;
 static uint64_t ts_rx_rpt;
 static uint64_t ts_tx_final;
 
+// Distances
 static uint64_t dist[MAX_NUM_ANCHORS];
 
 
+// Private functions
 static void app_header_write (app_header_t* app_header, uint8_t tx_buffer[]);
 static void app_header_read (app_header_t* app_header, uint8_t rx_buffer[]);
 static int app_wait_tx_done (void);
 static int app_wait_rx_done (void);
+static int app_aes_encrypt (uint8_t tx_buffer[], uint16_t tx_frame_len);
+static int app_aes_decrypt (uint8_t rx_buffer[], uint16_t rx_frame_len);
+static void app_sts_generate (void);
 static int app_send_init_msg (void);
 static int app_wait_init_msg (void);
 static int app_send_rqst_msg (void);
@@ -153,6 +173,13 @@ static void app_header_write (app_header_t* app_header, uint8_t tx_buffer[])
     tx_buffer[MAC_HEADER_LEN + 5] = (app_header->superframe_id >> 8) & 0xFF;
     tx_buffer[MAC_HEADER_LEN + 6] = (app_header->superframe_id >> 16) & 0xFF;
     tx_buffer[MAC_HEADER_LEN + 7] = (app_header->superframe_id >> 24) & 0xFF;
+    tx_buffer[MAC_HEADER_LEN + 8] = (app_header->superframe_id >> 32) & 0xFF;
+    tx_buffer[MAC_HEADER_LEN + 9] = (app_header->superframe_id >> 40) & 0xFF;
+    tx_buffer[MAC_HEADER_LEN + 10] = (app_header->superframe_id >> 48) & 0xFF;
+    tx_buffer[MAC_HEADER_LEN + 11] = (app_header->superframe_id >> 56) & 0xFF;
+
+    // Write slot ID in TX buffer
+    tx_buffer[MAC_HEADER_LEN + 12] = app_header->slot_id;
 
     return;
 }
@@ -169,69 +196,223 @@ static void app_header_read (app_header_t* app_header, uint8_t rx_buffer[])
     app_header->msg_type |= ((uint16_t) rx_buffer[MAC_HEADER_LEN + 3]) << 8;
 
     // Read superframe ID from RX buffer
-    app_header->superframe_id = (uint32_t) rx_buffer[MAC_HEADER_LEN + 4];
-    app_header->superframe_id |= ((uint32_t) rx_buffer[MAC_HEADER_LEN + 5]) << 8;
-    app_header->superframe_id |= ((uint32_t) rx_buffer[MAC_HEADER_LEN + 6]) << 16;
-    app_header->superframe_id |= ((uint32_t) rx_buffer[MAC_HEADER_LEN + 7]) << 24;
+    app_header->superframe_id = (uint64_t) rx_buffer[MAC_HEADER_LEN + 4];
+    app_header->superframe_id |= ((uint64_t) rx_buffer[MAC_HEADER_LEN + 5]) << 8;
+    app_header->superframe_id |= ((uint64_t) rx_buffer[MAC_HEADER_LEN + 6]) << 16;
+    app_header->superframe_id |= ((uint64_t) rx_buffer[MAC_HEADER_LEN + 7]) << 24;
+    app_header->superframe_id |= ((uint64_t) rx_buffer[MAC_HEADER_LEN + 8]) << 32;
+    app_header->superframe_id |= ((uint64_t) rx_buffer[MAC_HEADER_LEN + 9]) << 40;
+    app_header->superframe_id |= ((uint64_t) rx_buffer[MAC_HEADER_LEN + 10]) << 48;
+    app_header->superframe_id |= ((uint64_t) rx_buffer[MAC_HEADER_LEN + 11]) << 56;
+
+    // Read slot ID from RX buffer
+    app_header->slot_id = rx_buffer[MAC_HEADER_LEN + 12];
 
     return;
 }
 
 
+static int app_aes_encrypt (uint8_t tx_buffer[], uint16_t tx_frame_len)
+{
+    // Configure AES engine
+    dwt_aes_config_t aes_config;
+    aes_config.key_load = AES_KEY_Load;
+    aes_config.key_size = AES_KEY_128bit;
+    aes_config.key_src = AES_KEY_Src_Register;
+    aes_config.mic = MIC_16;
+    aes_config.mode = AES_Encrypt;
+    aes_config.aes_core_type = AES_core_type_GCM;
+    aes_config.aes_key_otp_type = AES_key_RAM;
+    aes_config.key_addr = 0;
+    dwt_configure_aes(&aes_config);
+
+    // Generate nonce
+    uint8_t nonce[12];
+    nonce[0] = slot_id;
+    nonce[1] = 0;
+    nonce[2] = 0;
+    nonce[3] = 0;
+    nonce[4] = superframe_id & 0xFF;
+    nonce[5] = (superframe_id >> 8) & 0xFF;
+    nonce[6] = (superframe_id >> 16) & 0xFF;
+    nonce[7] = (superframe_id >> 24) & 0xFF;
+    nonce[8] = (superframe_id >> 32) & 0xFF;
+    nonce[9] = (superframe_id >> 40) & 0xFF;
+    nonce[10] = (superframe_id >> 48) & 0xFF;
+    nonce[11] = (superframe_id >> 56) & 0xFF;
+
+    // Configure AES job
+    dwt_aes_job_t aes_job;
+    aes_job.nonce = nonce;               
+    aes_job.header = &tx_buffer[0];
+    aes_job.header_len = HEADER_LEN;
+    aes_job.payload = &tx_buffer[HEADER_LEN];
+    aes_job.payload_len = tx_frame_len - HEADER_LEN - FCS_LEN - MIC_LEN;
+    aes_job.src_port = AES_Src_Tx_buf;
+    aes_job.dst_port = AES_Dst_Tx_buf;
+    aes_job.mode = AES_Encrypt;
+    aes_job.mic_size = MIC_LEN;
+
+    // Encrypt data
+    int8_t aes_status = dwt_do_aes(&aes_job, aes_config.aes_core_type);
+    if ((aes_status < 0) || (aes_status & DWT_AES_ERRORS))
+    {
+        return APP_AES_ERROR;
+    }
+    
+    return APP_SUCCESS;
+}
+
+
+static int app_aes_decrypt (uint8_t rx_buffer[], uint16_t rx_frame_len)
+{
+    // Configure AES engine
+    dwt_aes_config_t aes_config;
+    aes_config.key_load = AES_KEY_Load;
+    aes_config.key_size = AES_KEY_128bit;
+    aes_config.key_src = AES_KEY_Src_Register;
+    aes_config.mic = MIC_16;
+    aes_config.mode = AES_Decrypt;
+    aes_config.aes_core_type = AES_core_type_GCM;
+    aes_config.aes_key_otp_type = AES_key_RAM;
+    aes_config.key_addr = 0;
+    dwt_configure_aes(&aes_config);
+
+    // Generate nonce
+    uint8_t nonce[12];
+    nonce[0] = slot_id;
+    nonce[1] = 0;
+    nonce[2] = 0;
+    nonce[3] = 0;
+    nonce[4] = superframe_id & 0xFF;
+    nonce[5] = (superframe_id >> 8) & 0xFF;
+    nonce[6] = (superframe_id >> 16) & 0xFF;
+    nonce[7] = (superframe_id >> 24) & 0xFF;
+    nonce[8] = (superframe_id >> 32) & 0xFF;
+    nonce[9] = (superframe_id >> 40) & 0xFF;
+    nonce[10] = (superframe_id >> 48) & 0xFF;
+    nonce[11] = (superframe_id >> 56) & 0xFF;
+
+    // Configure AES job
+    dwt_aes_job_t aes_job;
+    aes_job.nonce = nonce;               
+    aes_job.header = &rx_buffer[0];
+    aes_job.header_len = HEADER_LEN;
+    aes_job.payload = &rx_buffer[HEADER_LEN];
+    aes_job.payload_len = rx_frame_len - HEADER_LEN - FCS_LEN - MIC_LEN;
+    aes_job.src_port = AES_Src_Rx_buf_0;
+    aes_job.dst_port = AES_Dst_Rx_buf_0;
+    aes_job.mode = AES_Decrypt;
+    aes_job.mic_size = MIC_LEN;
+
+    // Decrypt data
+    int8_t aes_status = dwt_do_aes(&aes_job, aes_config.aes_core_type);
+    if ((aes_status < 0) || (aes_status & DWT_AES_ERRORS))
+    {
+        return APP_AES_ERROR;
+    }
+    
+    return APP_SUCCESS;
+}
+
+
+static void app_sts_generate (void)
+{
+    dwt_sts_cp_iv_t sts_iv;
+
+    // Set default STS init vector for first message of each superframe
+    if (slot_id == 0)
+    {
+        sts_iv.iv0 = 0;
+        sts_iv.iv1 = 0;
+        sts_iv.iv2 = 0;
+        sts_iv.iv3 = 0;
+    }
+
+    // Set unique STS init vector otherwise
+    else
+    {
+        sts_iv.iv0 = slot_id;
+        sts_iv.iv1 = superframe_id;
+        sts_iv.iv2 = superframe_id >> 32;
+        sts_iv.iv3 = 0;
+    }
+
+    // Write STS init vector
+    dwt_configurestsiv(&sts_iv);
+    dwt_configurestsloadiv();
+}
+
+
 static int app_wait_tx_done (void)
 {
-    volatile uint32_t sysstatuslo = dwt_readsysstatuslo();
-    volatile uint32_t sysstatushi = dwt_readsysstatushi();
+    volatile uint32_t sys_status_lo;
+    volatile uint32_t sys_status_hi;
 
     while (1)
     {
-        sysstatuslo = dwt_readsysstatuslo();
-        sysstatushi = dwt_readsysstatushi();
+        sys_status_lo = dwt_readsysstatuslo();
+        sys_status_hi = dwt_readsysstatushi();
         
         // Check if transmission is successfully completed
-        if (sysstatuslo & SYS_STATUS_TXFRS_BIT_MASK)
+        if (sys_status_lo & SYS_STATUS_TXFRS_BIT_MASK)
         {
             dwt_writesysstatuslo(SYS_STATUS_TXFRS_BIT_MASK);
-
             return APP_SUCCESS;
         }
 
         // Check if DW3000 system errors occurred during transmission
-        else if ((sysstatuslo & SYS_STATUS_LO_SYS_ERROR) || (sysstatushi & SYS_STATUS_HI_SYS_ERROR))
+        else if ((sys_status_lo & SYS_STATUS_LO_SYS_ERROR) || (sys_status_hi & SYS_STATUS_HI_SYS_ERROR))
         {
             dwt_forcetrxoff();
             dwt_writesysstatuslo(SYS_STATUS_LO_SYS_ERROR);
             dwt_writesysstatushi(SYS_STATUS_HI_SYS_ERROR);
-
             return APP_SYS_ERROR;
         }
 
         // Wait 50 us before next iteration
-        deca_usleep(50);
+        deca_usleep(TRX_POLL_TIME);
     }
 }
 
 
 static int app_wait_rx_done (void)
 {
-    volatile uint32_t sysstatuslo;
-    volatile uint32_t sysstatushi;
+    volatile uint32_t sys_status_lo;
+    volatile uint32_t sys_status_hi;
+
+    volatile int32_t sts_qual;
+    volatile int32_t sts_status;
+    int16_t sts_qual_idx;
+    uint16_t sts_status_val;
 
     while (1)
     {
-        sysstatuslo = dwt_readsysstatuslo();
-        sysstatushi = dwt_readsysstatushi();
+        sys_status_lo = dwt_readsysstatuslo();
+        sys_status_hi = dwt_readsysstatushi();
 
         // Check if reception is successfully completed
-        if ((sysstatuslo & SYS_STATUS_RXFCG_BIT_MASK) && (sysstatuslo & SYS_STATUS_CIADONE_BIT_MASK))
+        if ((sys_status_lo & SYS_STATUS_RXFCG_BIT_MASK) && (sys_status_lo & SYS_STATUS_CIADONE_BIT_MASK))
         {
             dwt_writesysstatuslo(SYS_STATUS_RXFCG_BIT_MASK | SYS_STATUS_CIADONE_BIT_MASK);
 
-            return APP_SUCCESS;
+            // Read STS quality and status
+            sts_qual = dwt_readstsquality(&sts_qual_idx, 0);
+            sts_status = dwt_readstsstatus(&sts_status_val, 0);
+
+            // Check if STS quality is good enough
+            if (sts_qual < 0 || sts_status < 0)
+            {
+                return APP_RX_ERROR;
+            }
+            else
+            {
+                return APP_SUCCESS;
+            }
         }
 
         // Check if PHY errors occurred or timeouts expired during reception
-        else if (sysstatuslo & SYS_STATUS_RX_ERROR)
+        else if (sys_status_lo & SYS_STATUS_RX_ERROR)
         {
             dwt_writesysstatuslo(SYS_STATUS_RX_ERROR);
 
@@ -239,7 +420,7 @@ static int app_wait_rx_done (void)
         }
 
         // Check if DW3000 system errors occurred during reception
-        else if ((sysstatuslo & SYS_STATUS_LO_SYS_ERROR) || (sysstatushi & SYS_STATUS_HI_SYS_ERROR))
+        else if ((sys_status_lo & SYS_STATUS_LO_SYS_ERROR) || (sys_status_hi & SYS_STATUS_HI_SYS_ERROR))
         {
             dwt_forcetrxoff();
             dwt_writesysstatuslo(SYS_STATUS_LO_SYS_ERROR);
@@ -249,33 +430,40 @@ static int app_wait_rx_done (void)
         }
         
         // Wait 50 us before next iteration
-        deca_usleep(50); 
+        deca_usleep(TRX_POLL_TIME); 
     }
 }
 
 
 static int app_send_init_msg (void)
 {
-    // Write TX frame length and create TX buffer
-    uint16_t tx_frame_len = HEADER_LEN + 3 + 2 * num_anchors + FCS_LEN;
+    int ret;
+
+    // Set TX frame length
+    uint16_t tx_frame_len = HEADER_LEN + 3 + 2 * num_anchors + MIC_LEN + FCS_LEN;
+    dwt_writetxfctrl(tx_frame_len, NULL_TX_BUFFER_OFFSET, RANGING_BIT_ENABLED);
+
+    // Create TX buffer
     uint8_t tx_buffer[tx_frame_len - FCS_LEN];
-    app_write_tx_frame_len(tx_frame_len);
 
     // Write MAC header
     mac_header_t mac_header;
     mac_header.frame_ctrl = MAC_FRAME_CTRL;
     mac_header.frame_seq_num = frame_seq_num;
-    mac_header.pan_id = my_pan_id;
+    mac_header.pan_id = pan_id;
     mac_header.dest_addr = BROADCAST_MAC_ADDR;
-    mac_header.src_addr = my_mac_addr;
+    mac_header.src_addr = mac_addr;
     mac_header_write(&mac_header, tx_buffer);
+
+    // Update superframe ID
+    superframe_id++;
 
     // Write app header
     app_header_t app_header;
     app_header.version = APP_VERSION;
     app_header.msg_type = APP_MSG_INIT;
-    superframe_id++;
     app_header.superframe_id = superframe_id;
+    app_header.slot_id = slot_id;
     app_header_write(&app_header, tx_buffer);
 
     // Write number of anchors
@@ -286,45 +474,55 @@ static int app_send_init_msg (void)
     tx_buffer[HEADER_LEN + 2] = (tag_mac_addr >> 8) & 0xFF;
 
     // Write anchors MAC adresses
-    for (int n = 0; n < num_anchors; n++)
+    for (int k = 0; k < num_anchors; k++)
     {
-        tx_buffer[HEADER_LEN + 3 + 2 * n] = anchor_mac_addr[n] & 0xFF;
-        tx_buffer[HEADER_LEN + 4 + 2 * n] = (anchor_mac_addr[n] >> 8) & 0xFF;
+        tx_buffer[HEADER_LEN + 3 + 2 * k] = anchor_mac_addr[k] & 0xFF;
+        tx_buffer[HEADER_LEN + 4 + 2 * k] = (anchor_mac_addr[k] >> 8) & 0xFF;
     }
 
     // Check if this node is an anchor
-    for (int n = 0; n < num_anchors; n++)
+    for (int k = 0; k < num_anchors; k++)
     {
-        if (anchor_mac_addr[n] == my_mac_addr)
+        if (anchor_mac_addr[k] == mac_addr)
         {
             node_type = ANCHOR;
-            anchor_id = n;
+            anchor_id = k;
             break;
         }
     }
 
     // Check if this node is a tag
-    if (tag_mac_addr == my_mac_addr)
+    if (tag_mac_addr == mac_addr)
     {
         node_type = TAG;
     }
 
-    // Write TX buffer
-    app_write_tx_buffer(tx_buffer, tx_frame_len);
+    // Generate STS
+    app_sts_generate();
 
-    // Start transmission (immediate)
-    dwt_starttx(DWT_START_TX_IMMEDIATE);
-
-    // Wait until transmission is completed or interrupted
-    int ret = app_wait_tx_done();
+    // Encrypt TX data
+    ret = app_aes_encrypt(tx_buffer, tx_frame_len);
     if (ret != APP_SUCCESS)
     {
         return ret;
     }
 
-    // Read TX timestamp of INIT message
-    ts_tx_init = app_read_tx_timestamp();
-    ts_rx_init = ts_tx_init;
+    // Start transmission (immediate)
+    ret = dwt_starttx(DWT_START_TX_IMMEDIATE);
+    if (ret != DWT_SUCCESS)
+    {
+        return APP_SYS_ERROR;
+    }
+
+    // Wait until transmission is completed or interrupted
+    ret = app_wait_tx_done();
+    if (ret != APP_SUCCESS)
+    {
+        return ret;
+    }
+
+    // Read TX timestamp of INIT message (TX stamp and RX stamp coincide in this case)
+    ts_rx_init = app_read_tx_timestamp();
 
     // Update frame sequence number
     frame_seq_num++;
@@ -335,14 +533,23 @@ static int app_send_init_msg (void)
 
 static int app_wait_init_msg (void)
 {
+    int ret;
+
     // Disable RX timeout
     app_set_rx_timeout(RX_TIMEOUT_DISABLED);
 
+    // Generate STS
+    app_sts_generate();
+
     // Start receiving (immediate)
-    dwt_rxenable(DWT_START_RX_IMMEDIATE);
+    ret = dwt_rxenable(DWT_START_RX_IMMEDIATE);
+    if (ret != DWT_SUCCESS)
+    {
+        return APP_SYS_ERROR;
+    }
 
     // Wait until reception is completed or interrupted
-    int ret = app_wait_rx_done();
+    ret = app_wait_rx_done();
     if (ret != APP_SUCCESS)
     {
         return ret;
@@ -351,16 +558,22 @@ static int app_wait_init_msg (void)
     // Read RX timestamp of INIT message
     ts_rx_init = app_read_rx_timestamp();
 
+    // Read RX frame length
+    uint16_t rx_frame_len = dwt_getframelength(NULL);
+    if (rx_frame_len < HEADER_LEN)
+    {
+        return APP_RUN_ERROR;
+    }
+
     // Read RX buffer
-    uint16_t rx_frame_len = app_read_rx_frame_len();
     uint8_t rx_buffer[rx_frame_len];
-    app_read_rx_buffer(rx_buffer, rx_frame_len);
+    dwt_readrxdata(rx_buffer, HEADER_LEN, NULL_RX_BUFFER_OFFSET);
     
     // Check MAC header
     mac_header_t mac_header;
     mac_header_read(&mac_header, rx_buffer);
     if (mac_header.frame_ctrl != MAC_FRAME_CTRL ||
-        mac_header.pan_id != my_pan_id ||
+        mac_header.pan_id != pan_id ||
         mac_header.dest_addr != BROADCAST_MAC_ADDR ||
         mac_header.src_addr != PAN_COORDINATOR_MAC_ADDR)
     {
@@ -371,13 +584,21 @@ static int app_wait_init_msg (void)
     app_header_t app_header;
     app_header_read(&app_header, rx_buffer);
     if (app_header.version != APP_VERSION ||
-        app_header.msg_type != APP_MSG_INIT)
+        app_header.msg_type != APP_MSG_INIT ||
+        app_header.slot_id != slot_id)
     {
         return APP_HEADER_WARNING;
     }
 
     // Set superframe ID
     superframe_id = app_header.superframe_id;
+
+    // Decrypt payload
+    ret = app_aes_decrypt(rx_buffer, rx_frame_len);
+    if (ret != APP_SUCCESS)
+    {
+        return ret;
+    }
 
     // Read number of anchors
     num_anchors = rx_buffer[HEADER_LEN];
@@ -386,16 +607,15 @@ static int app_wait_init_msg (void)
     tag_mac_addr = (uint16_t) rx_buffer[HEADER_LEN + 1];
     tag_mac_addr |= ((uint16_t) rx_buffer[HEADER_LEN + 2]) << 8;
     
-
     // Read anchors MAC addresses
-    for (int n = 0; n < num_anchors; n++)
+    for (int k = 0; k < num_anchors; k++)
     {
-        anchor_mac_addr[n] = (uint16_t) rx_buffer[HEADER_LEN + 3 + 2 * n];
-        anchor_mac_addr[n] |= ((uint16_t) rx_buffer[HEADER_LEN + 4 + 2 * n]) << 8;
+        anchor_mac_addr[k] = (uint16_t) rx_buffer[HEADER_LEN + 3 + 2 * k];
+        anchor_mac_addr[k] |= ((uint16_t) rx_buffer[HEADER_LEN + 4 + 2 * k]) << 8;
     }
 
     // Check if the node has been selected as tag
-    if (tag_mac_addr == my_mac_addr)
+    if (tag_mac_addr == mac_addr)
     {
         node_type = TAG;
 
@@ -403,12 +623,12 @@ static int app_wait_init_msg (void)
     }
 
     // Check if the node has been selected as anchor
-    for (int n = 0; n < num_anchors; n++)
+    for (int k = 0; k < num_anchors; k++)
     {
-        if (anchor_mac_addr[n] == my_mac_addr)
+        if (anchor_mac_addr[k] == mac_addr)
         {
             node_type = ANCHOR;
-            anchor_id = n;
+            anchor_id = k;
 
             return APP_SUCCESS;
         }
@@ -423,18 +643,22 @@ static int app_wait_init_msg (void)
 
 static int app_send_rqst_msg (void)
 {
-    // Write TX frame length and create TX buffer
-    uint16_t tx_frame_len = HEADER_LEN + FCS_LEN;
+    int ret;
+
+    // Set TX frame length
+    uint16_t tx_frame_len = HEADER_LEN + MIC_LEN + FCS_LEN;
+    dwt_writetxfctrl(tx_frame_len, NULL_TX_BUFFER_OFFSET, RANGING_BIT_ENABLED);
+
+    // Create TX buffer
     uint8_t tx_buffer[tx_frame_len - FCS_LEN];
-    app_write_tx_frame_len(tx_frame_len);
 
     // Write MAC header
     mac_header_t mac_header;
     mac_header.frame_ctrl = MAC_FRAME_CTRL;
     mac_header.frame_seq_num = frame_seq_num;
-    mac_header.pan_id = my_pan_id;
+    mac_header.pan_id = pan_id;
     mac_header.dest_addr = BROADCAST_MAC_ADDR;
-    mac_header.src_addr = my_mac_addr;
+    mac_header.src_addr = mac_addr;
     mac_header_write(&mac_header, tx_buffer);
 
     // Write app header
@@ -442,20 +666,32 @@ static int app_send_rqst_msg (void)
     app_header.version = APP_VERSION;
     app_header.msg_type = APP_MSG_RQST;
     app_header.superframe_id = superframe_id;
+    app_header.slot_id = slot_id;
     app_header_write(&app_header, tx_buffer);
-
-    // Write TX buffer
-    app_write_tx_buffer(tx_buffer, tx_frame_len);
 
     // Set TX timestamp of REQUEST message
     ts_tx_rqst = (ts_rx_init + slot_id * SLOT_TIME) & CLOCK_COARSE_MASK;
     app_set_delayed_trx_time(ts_tx_rqst);
 
+    // Generate STS
+    app_sts_generate();
+
+    // Encrypt TX data
+    ret = app_aes_encrypt(tx_buffer, tx_frame_len);
+    if (ret != APP_SUCCESS)
+    {
+        return ret;
+    }
+
     // Start transmission (delayed)
-    dwt_starttx(DWT_START_TX_DELAYED);
+    ret = dwt_starttx(DWT_START_TX_DELAYED);
+    if (ret != DWT_SUCCESS)
+    {
+        return APP_SYS_ERROR;
+    }
 
     // Wait until transmission is completed or interrupted
-    int ret = app_wait_tx_done();
+    ret = app_wait_tx_done();
     if (ret != APP_SUCCESS)
     {
         return ret;
@@ -471,17 +707,26 @@ static int app_send_rqst_msg (void)
 
 static int app_wait_rqst_msg (void)
 {
+    int ret;
+
     // Enable RX timeout
     app_set_rx_timeout(DEFAULT_RX_TIMEOUT);
 
     // Set timestamp to switch on the receiver
     app_set_delayed_trx_time(ts_rx_init + (slot_id - 1) * SLOT_TIME + DELAY_BEFORE_RX);
 
+    // Generate STS
+    app_sts_generate();
+
     // Start receiving (delayed)
-    dwt_rxenable(DWT_START_RX_DELAYED);
+    ret = dwt_rxenable(DWT_START_RX_DELAYED);
+    if (ret != DWT_SUCCESS)
+    {
+        return APP_SYS_ERROR;
+    }
 
     // Wait until transmission is completed or interrupted
-    int ret = app_wait_rx_done();
+    ret = app_wait_rx_done();
     if (ret != APP_SUCCESS)
     {
         return ret;
@@ -490,16 +735,22 @@ static int app_wait_rqst_msg (void)
     // Read RX timestamp of RQST message
     ts_rx_rqst = app_read_rx_timestamp();
 
+    // Read RX frame length
+    uint16_t rx_frame_len = dwt_getframelength(NULL);
+    if (rx_frame_len < HEADER_LEN)
+    {
+        return APP_RUN_ERROR;
+    }
+
     // Read RX buffer
-    uint16_t rx_frame_len = app_read_rx_frame_len();
     uint8_t rx_buffer[rx_frame_len];
-    app_read_rx_buffer(rx_buffer, rx_frame_len);
+    dwt_readrxdata(rx_buffer, HEADER_LEN, NULL_RX_BUFFER_OFFSET);
     
     // Check MAC header
     mac_header_t mac_header;
     mac_header_read(&mac_header, rx_buffer);
     if (mac_header.frame_ctrl != MAC_FRAME_CTRL ||
-        mac_header.pan_id != my_pan_id ||
+        mac_header.pan_id != pan_id ||
         mac_header.dest_addr != BROADCAST_MAC_ADDR ||
         mac_header.src_addr != tag_mac_addr)
     {
@@ -511,7 +762,8 @@ static int app_wait_rqst_msg (void)
     app_header_read(&app_header, rx_buffer);
     if (app_header.version != APP_VERSION ||
         app_header.msg_type != APP_MSG_RQST ||
-        app_header.superframe_id != superframe_id)
+        app_header.superframe_id != superframe_id ||
+        app_header.slot_id != slot_id)
     {
         return APP_HEADER_WARNING;
     }
@@ -522,18 +774,22 @@ static int app_wait_rqst_msg (void)
       
 static int app_send_resp_msg (void)
 {
-    // Write TX frame length and create TX buffer
-    uint16_t tx_frame_len = HEADER_LEN + FCS_LEN;
-    uint8_t tx_buffer[tx_frame_len - FCS_LEN];
-    app_write_tx_frame_len(tx_frame_len);
+    int ret;
 
+    // Set TX frame length
+    uint16_t tx_frame_len = HEADER_LEN + MIC_LEN + FCS_LEN;
+    dwt_writetxfctrl(tx_frame_len, NULL_TX_BUFFER_OFFSET, RANGING_BIT_ENABLED);
+
+    // Create TX buffer
+    uint8_t tx_buffer[tx_frame_len - FCS_LEN];
+    
     // Write MAC header
     mac_header_t mac_header;
     mac_header.frame_ctrl = MAC_FRAME_CTRL;
     mac_header.frame_seq_num = frame_seq_num;
-    mac_header.pan_id = my_pan_id;
+    mac_header.pan_id = pan_id;
     mac_header.dest_addr = tag_mac_addr;
-    mac_header.src_addr = my_mac_addr;
+    mac_header.src_addr = mac_addr;
     mac_header_write(&mac_header, tx_buffer);
 
     // Write app header
@@ -541,20 +797,32 @@ static int app_send_resp_msg (void)
     app_header.version = APP_VERSION;
     app_header.msg_type = APP_MSG_RESP;
     app_header.superframe_id = superframe_id;
+    app_header.slot_id = slot_id;
     app_header_write(&app_header, tx_buffer);
-
-    // Write TX buffer
-    app_write_tx_buffer(tx_buffer, tx_frame_len);
 
     // Set TX timestamp of RESPONSE message
     ts_tx_resp = (ts_rx_init + slot_id * SLOT_TIME) & CLOCK_COARSE_MASK;
     app_set_delayed_trx_time(ts_tx_resp);
 
+    // Generate STS
+    app_sts_generate();
+
+    // Encrypt TX data
+    ret = app_aes_encrypt(tx_buffer, tx_frame_len);
+    if (ret != APP_SUCCESS)
+    {
+        return ret;
+    }
+
     // Start transmission (delayed)
-    dwt_starttx(DWT_START_TX_DELAYED);
+    ret = dwt_starttx(DWT_START_TX_DELAYED);
+    if (ret != DWT_SUCCESS)
+    {
+        return APP_SYS_ERROR;
+    }
 
     // Wait until transmission is completed or interrupted
-    int ret = app_wait_tx_done();
+    ret = app_wait_tx_done();
     if (ret != APP_SUCCESS)
     {
         return ret;
@@ -570,39 +838,54 @@ static int app_send_resp_msg (void)
 
 static int app_wait_resp_msg (void)
 {
+    int ret;
+
     // Enable RX timeout
     app_set_rx_timeout(DEFAULT_RX_TIMEOUT);
 
     // Set timestamp to switch on the receiver
     app_set_delayed_trx_time(ts_rx_init + (slot_id - 1) * SLOT_TIME + DELAY_BEFORE_RX);
 
-    // Counter for RESPONSE messages
-    uint8_t cnt = slot_id - 2;
+    // Generate STS
+    app_sts_generate();
 
     // Start receiving (delayed)
-    dwt_rxenable(DWT_START_RX_DELAYED);
+    ret = dwt_rxenable(DWT_START_RX_DELAYED);
+    if (ret != DWT_SUCCESS)
+    {
+        return APP_SYS_ERROR;
+    }
 
     // Wait until reception is completed or interrupted
-    int ret = app_wait_rx_done();
+    ret = app_wait_rx_done();
     if (ret != APP_SUCCESS)
     {
         return ret;
     }
 
+    // Counter for RESPONSE messages
+    uint8_t cnt = slot_id - 2;
+
     // Read RX timestamp of RESPONSE message
-    ts_rx_resp[slot_id - 2] = app_read_rx_timestamp();
+    ts_rx_resp[cnt] = app_read_rx_timestamp();
+
+    // Read RX frame length
+    uint16_t rx_frame_len = dwt_getframelength(NULL);
+    if (rx_frame_len < HEADER_LEN)
+    {
+        return APP_RUN_ERROR;
+    }
 
     // Read RX buffer
-    uint16_t rx_frame_len = app_read_rx_frame_len();
     uint8_t rx_buffer[rx_frame_len];
-    app_read_rx_buffer(rx_buffer, rx_frame_len);
+    dwt_readrxdata(rx_buffer, HEADER_LEN, NULL_RX_BUFFER_OFFSET);
 
     // Check MAC header
     mac_header_t mac_header;
     mac_header_read(&mac_header, rx_buffer);
     if (mac_header.frame_ctrl != MAC_FRAME_CTRL ||
-        mac_header.pan_id != my_pan_id ||
-        mac_header.dest_addr != my_mac_addr ||
+        mac_header.pan_id != pan_id ||
+        mac_header.dest_addr != mac_addr ||
         mac_header.src_addr != anchor_mac_addr[cnt])
     {
         return MAC_HEADER_WARNING;
@@ -613,7 +896,8 @@ static int app_wait_resp_msg (void)
     app_header_read(&app_header, rx_buffer);
     if (app_header.version != APP_VERSION ||
         app_header.msg_type != APP_MSG_RESP ||
-        app_header.superframe_id != superframe_id)
+        app_header.superframe_id != superframe_id ||
+        app_header.slot_id != slot_id)
     {
         return APP_HEADER_WARNING;
     }
@@ -624,18 +908,22 @@ static int app_wait_resp_msg (void)
 
 static int app_send_report_msg (void)
 {
-    // Write TX frame length and create TX buffer
-    uint16_t tx_frame_len = HEADER_LEN + 8 + 4 * num_anchors + FCS_LEN;
+    int ret;
+
+    // Set TX frame length
+    uint16_t tx_frame_len = HEADER_LEN + 8 + 4 * num_anchors + MIC_LEN + FCS_LEN;
+    dwt_writetxfctrl(tx_frame_len, NULL_TX_BUFFER_OFFSET, RANGING_BIT_ENABLED);
+
+    // Create TX buffer
     uint8_t tx_buffer[tx_frame_len - FCS_LEN];
-    app_write_tx_frame_len(tx_frame_len);
 
     // Write MAC header
     mac_header_t mac_header;
     mac_header.frame_ctrl = MAC_FRAME_CTRL;
     mac_header.frame_seq_num = frame_seq_num;
-    mac_header.pan_id = my_pan_id;
+    mac_header.pan_id = pan_id;
     mac_header.dest_addr = BROADCAST_MAC_ADDR;
-    mac_header.src_addr = my_mac_addr;
+    mac_header.src_addr = mac_addr;
     mac_header_write(&mac_header, tx_buffer);
 
     // Write app header
@@ -643,6 +931,7 @@ static int app_send_report_msg (void)
     app_header.version = APP_VERSION;
     app_header.msg_type = APP_MSG_RPT;
     app_header.superframe_id = superframe_id;
+    app_header.slot_id = slot_id;
     app_header_write(&app_header, tx_buffer);
 
     // Write TX timestamp of REQUEST message
@@ -652,12 +941,12 @@ static int app_send_report_msg (void)
     tx_buffer[HEADER_LEN + 3] = (ts_tx_rqst >> 24) & 0xFF;
     
     // Write RX timestamp of RESPONSE messages
-    for (int n = 0; n < num_anchors; n++)
+    for (int k = 0; k < num_anchors; k++)
     {
-        tx_buffer[HEADER_LEN + 4 + 4 * n] = ts_rx_resp[n] & 0xFF;
-        tx_buffer[HEADER_LEN + 5 + 4 * n] = (ts_rx_resp[n] >> 8) & 0xFF;
-        tx_buffer[HEADER_LEN + 6 + 4 * n] = (ts_rx_resp[n] >> 16) & 0xFF;
-        tx_buffer[HEADER_LEN + 7 + 4 * n] = (ts_rx_resp[n] >> 24) & 0xFF;
+        tx_buffer[HEADER_LEN + 4 + 4 * k] = ts_rx_resp[k] & 0xFF;
+        tx_buffer[HEADER_LEN + 5 + 4 * k] = (ts_rx_resp[k] >> 8) & 0xFF;
+        tx_buffer[HEADER_LEN + 6 + 4 * k] = (ts_rx_resp[k] >> 16) & 0xFF;
+        tx_buffer[HEADER_LEN + 7 + 4 * k] = (ts_rx_resp[k] >> 24) & 0xFF;
     }
 
     // Set TX timestamp of REPORT message
@@ -669,17 +958,28 @@ static int app_send_report_msg (void)
     tx_buffer[HEADER_LEN + 6 + 4 * num_anchors] = (ts_tx_rpt >> 16) & 0xFF;
     tx_buffer[HEADER_LEN + 7 + 4 * num_anchors] = (ts_tx_rpt >> 24) & 0xFF;
 
-    // Write TX buffer
-    app_write_tx_buffer(tx_buffer, tx_frame_len);
-
     // Set TX timestamp
     app_set_delayed_trx_time(ts_tx_rpt);
 
+    // Generate STS
+    app_sts_generate();
+
+    // Encrypt TX data
+    ret = app_aes_encrypt(tx_buffer, tx_frame_len);
+    if (ret != APP_SUCCESS)
+    {
+        return ret;
+    }
+
     // Start transmission (delayed)
-    dwt_starttx(DWT_START_TX_DELAYED);
+    ret = dwt_starttx(DWT_START_TX_DELAYED);
+    if (ret != DWT_SUCCESS)
+    {
+        return APP_SYS_ERROR;
+    }
 
     // Wait until transmission is completed
-    int ret = app_wait_tx_done();
+    ret = app_wait_tx_done();
     if (ret != APP_SUCCESS)
     {
         return ret;
@@ -695,32 +995,47 @@ static int app_send_report_msg (void)
 
 static int app_wait_report_msg (void)
 {
+    int ret;
+
     // Enable RX timeout
     app_set_rx_timeout(DEFAULT_RX_TIMEOUT);
 
     // Set timestamp to switch on the receiver
     app_set_delayed_trx_time(ts_rx_init + (slot_id - 1) * SLOT_TIME + DELAY_BEFORE_RX);
 
+    // Generate STS
+    app_sts_generate();
+
     // Start receiving (delayed)
-    dwt_rxenable(DWT_START_RX_DELAYED);
+    ret = dwt_rxenable(DWT_START_RX_DELAYED);
+    if (ret != DWT_SUCCESS)
+    {
+        return APP_SYS_ERROR;
+    }
 
     // Wait until reception is completed or interrupted
-    int ret = app_wait_rx_done();
+    ret = app_wait_rx_done();
     if (ret != APP_SUCCESS)
     {
         return ret;
     }
 
+    // Read RX frame length
+    uint16_t rx_frame_len = dwt_getframelength(NULL);
+    if (rx_frame_len < HEADER_LEN)
+    {
+        return APP_RUN_ERROR;
+    }
+
     // Read RX buffer
-    uint16_t rx_frame_len = app_read_rx_frame_len();
     uint8_t rx_buffer[rx_frame_len];
-    app_read_rx_buffer(rx_buffer, rx_frame_len);
+    dwt_readrxdata(rx_buffer, HEADER_LEN, NULL_RX_BUFFER_OFFSET);
 
     // Check MAC header
     mac_header_t mac_header;
     mac_header_read(&mac_header, rx_buffer);
     if (mac_header.frame_ctrl != MAC_FRAME_CTRL ||
-        mac_header.pan_id != my_pan_id ||
+        mac_header.pan_id != pan_id ||
         mac_header.dest_addr != BROADCAST_MAC_ADDR ||
         mac_header.src_addr != tag_mac_addr)
     {
@@ -732,9 +1047,17 @@ static int app_wait_report_msg (void)
     app_header_read(&app_header, rx_buffer);
     if (app_header.version != APP_VERSION ||
         app_header.msg_type != APP_MSG_RPT ||
-        app_header.superframe_id != superframe_id)
+        app_header.superframe_id != superframe_id ||
+        app_header.slot_id != slot_id)
     {
         return APP_HEADER_WARNING;
+    }
+
+    // Decrypt payload
+    ret = app_aes_decrypt(rx_buffer, rx_frame_len);
+    if (ret != APP_SUCCESS)
+    {
+        return ret;
     }
 
     // Read TX timestamp of REQUEST message
@@ -758,12 +1081,8 @@ static int app_wait_report_msg (void)
     // Read RX timestamp of REPORT message
     ts_rx_rpt = app_read_rx_timestamp();
 
-    // Compute distance (cm)
-    if (ts_rx_resp[anchor_id] == 0ULL)
-    {
-        dist[anchor_id] = 0UL;
-    }
-    else
+    // Compute distance (DS-TWR formula) if RESP message was successfully received
+    if (ts_rx_resp[anchor_id] != 0ULL)
     {
         uint64_t rtt_a = ((ts_rx_resp[anchor_id] | CLOCK_CYCLE) - ts_tx_rqst) & CLOCK_FINE_MASK;
         uint64_t rtt_b = ((ts_rx_rpt | CLOCK_CYCLE) - ts_tx_resp) & CLOCK_FINE_MASK;
@@ -778,18 +1097,22 @@ static int app_wait_report_msg (void)
 
 static int app_send_final_msg (void)
 {
-    // Write TX frame length and create TX buffer
-    uint16_t tx_frame_len = HEADER_LEN + 4 + FCS_LEN;
+    int ret;
+
+    // Set TX frame length
+    uint16_t tx_frame_len = HEADER_LEN + 4 + MIC_LEN + FCS_LEN;
+    dwt_writetxfctrl(tx_frame_len, NULL_TX_BUFFER_OFFSET, RANGING_BIT_ENABLED);
+
+    // Create TX buffer
     uint8_t tx_buffer[tx_frame_len - FCS_LEN];
-    app_write_tx_frame_len(tx_frame_len); // Zero offset in TX buffer, ranging enabled
 
     // Write MAC header
     mac_header_t mac_header;
     mac_header.frame_ctrl = MAC_FRAME_CTRL;
     mac_header.frame_seq_num = frame_seq_num;
-    mac_header.pan_id = my_pan_id;
+    mac_header.pan_id = pan_id;
     mac_header.dest_addr = BROADCAST_MAC_ADDR;
-    mac_header.src_addr = my_mac_addr;
+    mac_header.src_addr = mac_addr;
     mac_header_write(&mac_header, tx_buffer);
 
     // Write app header
@@ -797,6 +1120,7 @@ static int app_send_final_msg (void)
     app_header.version = APP_VERSION;
     app_header.msg_type = APP_MSG_FINAL;
     app_header.superframe_id = superframe_id;
+    app_header.slot_id = slot_id;
     app_header_write(&app_header, tx_buffer);
 
     // Write distance
@@ -805,18 +1129,28 @@ static int app_send_final_msg (void)
     tx_buffer[HEADER_LEN + 2] = (dist[anchor_id] >> 16) & 0xFF;
     tx_buffer[HEADER_LEN + 3] = (dist[anchor_id] >> 24) & 0xFF;
 
-    // Write TX buffer
-    app_write_tx_buffer(tx_buffer, tx_frame_len); // Zero offset in TX buffer
-
     // Set TX timestamp for FINAL frame
     ts_tx_final = (ts_rx_init + slot_id * SLOT_TIME) & CLOCK_COARSE_MASK;
     app_set_delayed_trx_time(ts_tx_final);
 
-    // Start transmission (delayed)
-    dwt_starttx(DWT_START_TX_DELAYED);
+    // Generate STS
+    app_sts_generate();
+
+    // Encrypt TX data
+    ret = app_aes_encrypt(tx_buffer, tx_frame_len);
+    if (ret != APP_SUCCESS)
+    {
+        return ret;
+    }
+
+    ret = dwt_starttx(DWT_START_TX_DELAYED);
+    if (ret != DWT_SUCCESS)
+    {
+        return APP_SYS_ERROR;
+    }
 
     // Wait until transmission is completed or interrupted
-    int ret = app_wait_tx_done();
+    ret = app_wait_tx_done();
     if (ret != APP_SUCCESS)
     {
         return ret;
@@ -832,35 +1166,50 @@ static int app_send_final_msg (void)
 
 static int app_wait_final_msg (void)
 {
+    int ret;
+
     // Enable RX timeout
     app_set_rx_timeout(DEFAULT_RX_TIMEOUT);
 
     // Set timestamp to switch on receiver
     app_set_delayed_trx_time(ts_rx_init + (slot_id - 1) * SLOT_TIME + DELAY_BEFORE_RX);
 
-    // Counter for FINAL messages
-    uint8_t cnt = slot_id - 3 - num_anchors;
+    // Generate STS
+    app_sts_generate();
 
     // Start receiving (delayed)
-    dwt_rxenable(DWT_START_RX_DELAYED);
+    ret = dwt_rxenable(DWT_START_RX_DELAYED);
+    if (ret != DWT_SUCCESS)
+    {
+        return APP_SYS_ERROR;
+    }
 
     // Wait until reception is completed or interrupted
-    int ret = app_wait_rx_done();
+    ret = app_wait_rx_done();
     if (ret != APP_SUCCESS)
     {
         return ret;
     }
 
+    // Read RX frame length
+    uint16_t rx_frame_len = dwt_getframelength(NULL);
+    if (rx_frame_len < HEADER_LEN)
+    {
+        return APP_RUN_ERROR;
+    }
+
     // Read RX buffer
-    uint16_t rx_frame_len = app_read_rx_frame_len();
     uint8_t rx_buffer[rx_frame_len];
-    app_read_rx_buffer(rx_buffer, rx_frame_len);
+    dwt_readrxdata(rx_buffer, HEADER_LEN, NULL_RX_BUFFER_OFFSET);
+
+    // Counter for FINAL messages
+    uint8_t cnt = slot_id - 3 - num_anchors;
 
     // Check MAC header
     mac_header_t mac_header;
     mac_header_read(&mac_header, rx_buffer);
     if (mac_header.frame_ctrl != MAC_FRAME_CTRL ||
-        mac_header.pan_id != my_pan_id ||
+        mac_header.pan_id != pan_id ||
         mac_header.dest_addr != BROADCAST_MAC_ADDR ||
         mac_header.src_addr != anchor_mac_addr[cnt])
     {
@@ -872,22 +1221,30 @@ static int app_wait_final_msg (void)
     app_header_read(&app_header, rx_buffer);
     if (app_header.version != APP_VERSION ||
         app_header.msg_type != APP_MSG_FINAL ||
-        app_header.superframe_id != superframe_id)
+        app_header.superframe_id != superframe_id ||
+        app_header.slot_id != slot_id)
     {
         return APP_HEADER_WARNING;
     }
 
-    // Read distance (cm)
-    dist[cnt] = (uint64_t)rx_buffer[HEADER_LEN];
-    dist[cnt] |= ((uint64_t)rx_buffer[HEADER_LEN + 1]) << 8;
-    dist[cnt] |= ((uint64_t)rx_buffer[HEADER_LEN + 2]) << 16;
-    dist[cnt] |= ((uint64_t)rx_buffer[HEADER_LEN + 3]) << 24;
+    // Decrypt payload
+    ret = app_aes_decrypt(rx_buffer, rx_frame_len);
+    if (ret != APP_SUCCESS)
+    {
+        return ret;
+    }
+
+    // Read distance
+    dist[cnt] = (uint64_t) rx_buffer[HEADER_LEN];
+    dist[cnt] |= ((uint64_t) rx_buffer[HEADER_LEN + 1]) << 8;
+    dist[cnt] |= ((uint64_t) rx_buffer[HEADER_LEN + 2]) << 16;
+    dist[cnt] |= ((uint64_t) rx_buffer[HEADER_LEN + 3]) << 24;
 
     return APP_SUCCESS;
 }
 
 
-int app_run_ieee_802_15_4_schedule (void)
+int app_run_ieee_802_15_4z_schedule (void)
 {
     int ret = 0;
 
@@ -896,23 +1253,22 @@ int app_run_ieee_802_15_4_schedule (void)
     slot_id = 0;
 
     // Zeroing all timestamps
-    ts_tx_init = 0ULL;
-    ts_rx_init = 0ULL;
-    ts_tx_rqst = 0ULL;
-    ts_rx_rqst = 0ULL;
-    ts_tx_resp = 0ULL;
+    ts_rx_init = 0ull;
+    ts_tx_rqst = 0ull;
+    ts_rx_rqst = 0ull;
+    ts_tx_resp = 0ull;
     for (int k = 0; k < MAX_NUM_ANCHORS; k++)
     {
-        ts_rx_resp[k] = 0ULL;
+        ts_rx_resp[k] = 0ull;
     }
-    ts_tx_rpt = 0ULL;
-    ts_rx_rpt= 0ULL;
-    ts_tx_final = 0ULL;
+    ts_tx_rpt = 0ull;
+    ts_rx_rpt= 0ull;
+    ts_tx_final = 0ull;
 
     // Zeroing all distances
     for (int k = 0; k < MAX_NUM_ANCHORS; k++)
     {
-        dist[k] = 0ULL;
+        dist[k] = 0ull;
     }
 
     // Start loop
@@ -923,7 +1279,7 @@ int app_run_ieee_802_15_4_schedule (void)
             case APP_STATE_BEGIN:
 
                 // Prepare to send INIT message if the node is the PAN coordinator
-                if (my_mac_addr == PAN_COORDINATOR_MAC_ADDR)
+                if (mac_addr == PAN_COORDINATOR_MAC_ADDR)
                 {
                     app_state = APP_STATE_SEND_INIT_MSG;
                 }
@@ -973,6 +1329,13 @@ int app_run_ieee_802_15_4_schedule (void)
                             app_state = APP_STATE_WAIT_RQST_MSG;
 
                         break;
+
+                        default:
+
+                            ret = APP_RUN_ERROR;
+                            app_state = APP_STATE_END;
+
+                        break;
                     }
                 }
 
@@ -1014,6 +1377,13 @@ int app_run_ieee_802_15_4_schedule (void)
                             app_state = APP_STATE_WAIT_RQST_MSG;
 
                         break;
+
+                        default:
+
+                            ret = APP_RUN_ERROR;
+                            app_state = APP_STATE_END;
+
+                        break;
                     }
                 }
 
@@ -1040,7 +1410,7 @@ int app_run_ieee_802_15_4_schedule (void)
             break;
 
             case APP_STATE_WAIT_RQST_MSG:
-                
+
                 ret = app_wait_rqst_msg();
                 
                 // Exit if REQUEST message was not received
@@ -1178,126 +1548,114 @@ int app_run_ieee_802_15_4_schedule (void)
 }
 
 
-int app_set_mac_addr (uint16_t mac_addr)
+int app_init (app_init_obj_t *obj)
 {
-    // Check if MAC address is valid
-    if (mac_addr == BROADCAST_MAC_ADDR)
+    // Check if MAC address and PAN ID are valid
+    if (obj->mac_addr == BROADCAST_MAC_ADDR || obj->pan_id == BROADCAST_PAN_ID)
     {
         return APP_CONFIG_ERROR;
     }
 
     // Set MAC address
-    my_mac_addr = mac_addr;
+    mac_addr = obj->mac_addr;
 
-    return APP_SUCCESS;
-}
-
-
-uint16_t app_get_mac_addr (void)
-{
-    return my_mac_addr;
-}
-
-
-int app_set_pan_id (uint16_t pan_id)
-{
-    // Check if PAN ID is valid
-    if (pan_id == BROADCAST_PAN_ID)
-    {
-        return APP_CONFIG_ERROR;
-    }
-    
     // Set PAN ID
-    my_pan_id = pan_id;
+    pan_id = obj->pan_id;
+
+    // Set STS key
+    sts_key.key0 = obj->sts_key.key0;
+    sts_key.key1 = obj->sts_key.key1;
+    sts_key.key2 = obj->sts_key.key2;
+    sts_key.key3 = obj->sts_key.key3;
+    dwt_configurestskey(&sts_key);
+
+    // Set AES key
+    aes_key.key0 = obj->aes_key.key0;
+    aes_key.key1 = obj->aes_key.key1;
+    aes_key.key2 = obj->aes_key.key2;
+    aes_key.key3 = obj->aes_key.key3;
+    aes_key.key4 = obj->aes_key.key4;
+    aes_key.key5 = obj->aes_key.key5;
+    aes_key.key6 = obj->aes_key.key6;
+    aes_key.key7 = obj->aes_key.key7;
+    dwt_set_keyreg_128(&aes_key);
     
     return APP_SUCCESS;
 }
 
 
-uint16_t app_get_pan_id (void)
+int app_set_ctrl_params (app_ctrl_obj_t *obj)
 {
-    return my_pan_id;
-}
-
-
-int app_set_tag_mac_addr (uint16_t mac_addr)
-{
-    // Check if MAC address is valid
-    if (mac_addr == BROADCAST_MAC_ADDR)
+    // Check if tag MAC address is valid
+    if (obj->tag_mac_addr == BROADCAST_MAC_ADDR)
     {
         return APP_CONFIG_ERROR;
     }
 
-    // Set tag MAC address
-    tag_mac_addr = mac_addr;
-
-    return APP_SUCCESS;
-}
-
-
-int app_set_anchor_mac_addr (uint16_t mac_addr[], uint8_t cnt)
-{
     // Check if number of anchors exceeds the maximum limit
-    if (cnt == 0 || cnt > MAX_NUM_ANCHORS)
+    if (obj->num_anchors == 0 || obj->num_anchors > MAX_NUM_ANCHORS)
     {
         return APP_CONFIG_ERROR;
     }
 
-    // Check if all the MAC addresses are valid
-    for (int k = 0; k < cnt; k++)
+    // Check if the MAC addresses of all the anchors are valid
+    for (int k = 0; k < obj->num_anchors; k++)
     {
-        if (mac_addr[k] == BROADCAST_MAC_ADDR)
+        if (obj->anchor_mac_addr[k] == BROADCAST_MAC_ADDR)
         {
             return APP_CONFIG_ERROR;
         }
     }
 
+    // Set tag MAC address
+    tag_mac_addr = obj->tag_mac_addr;
+
     // Set number of anchors
-    num_anchors = cnt;
+    num_anchors = obj->num_anchors;
 
     // Set anchors MAC addresses
     for (int k = 0; k < num_anchors; k++)
     {
-        anchor_mac_addr[k] = mac_addr[k];
+        anchor_mac_addr[k] = obj->anchor_mac_addr[k];
     }
 
     return APP_SUCCESS;
 }
 
 
-void app_get_ranging_info (app_ranging_info_t *ranging_info)
+void app_read_log_info (app_log_info_t *info)
 {
     // Write superframe ID
-    ranging_info->superframe_id = superframe_id;
+    info->superframe_id = superframe_id;
 
     // Write timestamp of INIT message
-    ranging_info->timestamp = ts_rx_init;
+    info->ts_init = ts_rx_init;
 
     // Write distances
     for (int k = 0; k < MAX_NUM_ANCHORS; k++)
     {
-        ranging_info->dist[k] = dist[k];
+        info->dist[k] = dist[k];
     }
 
     // Write number of anchors
-    ranging_info->num_anchors = num_anchors;
+    info->num_anchors = num_anchors;
 
     // Write tag MAC address
-    ranging_info->tag_mac_addr = tag_mac_addr;
+    info->tag_mac_addr = tag_mac_addr;
 
     // Write anchors MAC addresses
     for (int k = 0; k < MAX_NUM_ANCHORS; k++)
     {
-        ranging_info->anchor_mac_addr[k] = anchor_mac_addr[k];
+        info->anchor_mac_addr[k] = anchor_mac_addr[k];
     }
 
     return;
 }
 
 
-void app_sleep (uint16_t time_ms)
+void app_sleep (uint16_t ms)
 {
-    deca_sleep(time_ms);
+    deca_sleep(ms);
 
     return;
 }

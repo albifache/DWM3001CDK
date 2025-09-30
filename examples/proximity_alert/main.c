@@ -9,57 +9,59 @@
 #include "../../app/app.h"
 #include "../../mac/mac.h"
 #include "../../phy/phy.h"
-#include "../../port/port.h"   
+#include "../../port/port.h"
 #include <stdio.h>
 #include <zephyr/sys/printk.h>
 
 
-#define PRECAL_TX_POWER                 0
-#define PRECAL_ANT_DELAY                0
+#define RF_CHAN                                 5                           // UWB channel (5 or 9)
+#define PREAMBLE_CODE                           9                           // Preamble code
+#define BIT_RATE                                DWT_BR_850K                 // UWB bit rate
+#define PREAMBLE_LEN                            DWT_PLEN_1024               // Preamble length (number of symbols)
+#define STS_LEN                                 DWT_STS_LEN_1024            // STS length (number of symbols)
 
-#define BLUE_LED                        3
-#define RED_LED                         1
+#define MAC_ADDR                                0x00u                       // MAC address of current node
+#define PAN_ID                                  0x00u                       // PAN ID of current network
 
-#define GUARD_TIME                      10                  // Guard time (ms)
-#define SLEEP_TIME                      100                 // Sleeping time (ms)
-#define BLINK_TIME                      100                 // LED blinking time (ms)
+#define STS_KEY_0                               0ul                         // STS key (bits 0-31)
+#define STS_KEY_1                               0ul                         // STS key (bits 32-63)
+#define STS_KEY_2                               0ul                         // STS key (bits 64-95)
+#define STS_KEY_3                               0ul                         // STS key (bits 96-127)
 
-#define LIGHT_SPEED                     2.99702547e8f       // Speed of light (m/s)
+#define AES_KEY_0                               0ul                         // AES key (bits 0-31)
+#define AES_KEY_1                               0ul                         // AES key (bits 32-63)
+#define AES_KEY_2                               0ul                         // AES key (bits 64-95)
+#define AES_KEY_3                               0ul                         // AES key (bits 96-127)
 
-#define ALERT_DIST                      1.0f                // Alert distance (m)
+#define NUM_ANCHORS                             2                           // Number of anchors (max 4)
+
+#define ANCHOR_MAC_ADDR_0                       0x06                        // MAC address of anchor 0
+#define ANCHOR_MAC_ADDR_1                       0x07                        // MAC address of anchor 1
+#define ANCHOR_MAC_ADDR_2                       0x00                        // MAC address of anchor 2 (unused in this case)
+#define ANCHOR_MAC_ADDR_3                       0x00                        // MAC address of anchor 3 (unused in this case)
+
+#define GREEN_LED                               0                           // LED that blinks when tag is too close to anchor 0
+#define RED_LED_0                               1                           // LED that blinks when tag is too close to anchor 1
+#define RED_LED_1                               2                           // LED that blinks when tag is too close to anchor 2
+#define BLUE_LED                                3                           // LED that blinks when tag is too close to anchor 3
+
+#define ALERT_DIST                              1.0f                        // Alert distance (m)
+
+#define GUARD_TIME                              10                          // Guard time (ms)
+#define SLEEP_TIME                              100                         // Sleeping time (ms)
+#define BLINK_TIME                              100                         // LED blinking time (ms)
+
+#define LIGHT_SPEED                             2.99702547e8f               // Speed of light (m/s)
 
 
-static uint16_t my_mac_addr = 0x07;
-static uint16_t my_pan_id = 0x00;
+static phy_init_obj_t phy_init_obj;
 
-//static uint16_t tag_mac_addr = PAN_COORDINATOR_MAC_ADDR;
-static uint16_t anchor_mac_addr[] = {0x06, 0x07};
-static uint8_t num_anchors = sizeof(anchor_mac_addr) / sizeof(uint16_t);
+static app_init_obj_t app_init_obj;
+static app_ctrl_obj_t app_ctrl_obj;
+static app_log_info_t app_log_info;
 
-static uint8_t led_id[] = {BLUE_LED, RED_LED};
-static volatile bool led_state[] = {false, false};
-
-static app_ranging_info_t ranging_info;
+static uint8_t led_id[NUM_LEDS];
 static float dist[NUM_LEDS];
-
-static uint16_t ant_delay = PRECAL_ANT_DELAY ;
-static uint32_t tx_power = PRECAL_TX_POWER;
-static dwt_config_t config =
-{
-    .chan = 5,
-    .txPreambLength = DWT_PLEN_1024,
-    .rxPAC = DWT_PAC16,
-    .txCode = 9,
-    .rxCode = 9,
-    .sfdType = DWT_SFD_IEEE_4A,
-    .dataRate = DWT_BR_850K,
-    .phrMode = DWT_PHRMODE_STD,
-    .phrRate = DWT_PHRRATE_STD,
-    .sfdTO = 1025,
-    .stsMode = DWT_STS_MODE_OFF,
-    .stsLength = DWT_STS_LEN_64,
-    .pdoaMode = DWT_PDOA_M0
-};
 
 
 int main (void)
@@ -70,116 +72,144 @@ int main (void)
     ret = led_gpio_init();
     if (ret != PORT_SUCCESS)
     {
-        printk("\nLEDs initialization failed.\n");
+        printk("\n[ERROR] LEDs initialization failed.\n");
         while(1);
     }
-    else
-    {
-        printk("\nLEDs initialization successful.\n");
-    }
-
-    // Initialize DW3000 IC
-    ret = phy_device_init();
-    if (ret != PHY_SUCCESS)
-    {
-        printk("\nDW3000 initialization failed.\n");
-        while(1);
-    }
-    else
-    {
-        printk("\nDW3000 initialization successful.\n");
-    }
-
-    // Configure DW3000 IC
-    ret = phy_set_config(&config);
-    if (ret != PHY_SUCCESS)
-    {
-        printk("\nDW3000 configuration failed.\n");
-        while(1);
-    }
-    else
-    {
-        printk("\nDW3000 configuration successful.\n");
-    }
-
-    // Set TX power
-    phy_set_tx_power(tx_power);
     
-    // Set antenna delay
-    phy_set_ant_delay(ant_delay);
-
-    // Check MAC errors
-    if (num_anchors > NUM_LEDS || my_mac_addr == BROADCAST_MAC_ADDR || my_pan_id == BROADCAST_PAN_ID)
+    // Initialize DW3000 IC
+    ret = deca_init();
+    if (ret != PORT_SUCCESS)
     {
-        //printk("\nMAC configuration error.\n");
+        printk("\n[ERROR] DW3000 initialization failed.\n");
         while(1);
     }
-    else
+
+    // Set PHY parameters
+    phy_init_obj.rf_chan = RF_CHAN;
+    phy_init_obj.preamble_code = PREAMBLE_CODE;
+    phy_init_obj.preamble_len = PREAMBLE_LEN;
+    phy_init_obj.bit_rate = BIT_RATE;
+    phy_init_obj.sts_len = STS_LEN;
+
+    // Initialize PHY
+    ret = phy_init(&phy_init_obj);
+    if (ret != PHY_SUCCESS)
     {
-        //printk("\nMAC configuration successful.\n");
+        printk("\n[ERROR] DW3000 configuration failed.\n");
+        while(1);
     }
 
-    // set MAC address
-    app_set_mac_addr(my_mac_addr);
+    // Set MAC address
+    app_init_obj.mac_addr = MAC_ADDR;
 
-    // set PAN ID
-    app_set_pan_id(my_pan_id);
+    // Set PAN ID
+    app_init_obj.pan_id = PAN_ID;
 
-    // set tag MAC address
-    app_set_tag_mac_addr(PAN_COORDINATOR_MAC_ADDR);
+    // Set STS key (128 bits)
+    app_init_obj.sts_key.key0 = STS_KEY_0;
+    app_init_obj.sts_key.key1 = STS_KEY_1;
+    app_init_obj.sts_key.key2 = STS_KEY_2;
+    app_init_obj.sts_key.key3 = STS_KEY_3;
 
-    // Set anchors MAC addresses
-    app_set_anchor_mac_addr(anchor_mac_addr, num_anchors);
+    // Set AES key (128 bits)
+    app_init_obj.aes_key.key0 = AES_KEY_0;
+    app_init_obj.aes_key.key1 = AES_KEY_1;
+    app_init_obj.aes_key.key2 = AES_KEY_2;
+    app_init_obj.aes_key.key3 = AES_KEY_3;
+    app_init_obj.aes_key.key4 = 0;
+    app_init_obj.aes_key.key5 = 0;
+    app_init_obj.aes_key.key6 = 0;
+    app_init_obj.aes_key.key7 = 0;
+
+    // Check if initialization parameters are valid
+    if (app_init_obj.mac_addr == BROADCAST_MAC_ADDR ||
+        app_init_obj.pan_id == BROADCAST_PAN_ID)
+    {
+        printk("\n[ERROR] App initialization failed.\n");
+        while(1);
+    }
+
+    // Initialize app
+    app_init(&app_init_obj);
+
+    // Set tag MAC address
+    app_ctrl_obj.tag_mac_addr = PAN_COORDINATOR_MAC_ADDR;
+
+    // Set number of anchors
+    app_ctrl_obj.num_anchors = NUM_ANCHORS;
+
+    // Anchors MAC addresses
+    app_ctrl_obj.anchor_mac_addr[0] = ANCHOR_MAC_ADDR_0;
+    app_ctrl_obj.anchor_mac_addr[1] = ANCHOR_MAC_ADDR_1;
+    app_ctrl_obj.anchor_mac_addr[2] = ANCHOR_MAC_ADDR_2;
+    app_ctrl_obj.anchor_mac_addr[3] = ANCHOR_MAC_ADDR_3;
+
+    // Check if number of anchors is valid
+    if (app_ctrl_obj.num_anchors > NUM_LEDS)
+    {
+        printk("\n[ERROR] Total number of anchors should not exceed %d.\n", NUM_LEDS);
+        while(1);
+    }
+
+    // Set app runtime parameters
+    app_set_ctrl_params(&app_ctrl_obj);
+
+    // Set LEDs ID table
+    led_id[0] = BLUE_LED;
+    led_id[1] = RED_LED_0;
+    led_id[2] = RED_LED_1;
+    led_id[3] = GREEN_LED;
+
+    // Switch off LEDs as default
+    for (int k = 0; k < NUM_LEDS; k++)
+    {
+        led_gpio_write(led_id[k], false);
+    }
 
     // Begin loop
     while (1)
     {
-        // Wait a bit before proceeding to make sure anchors have receiver switched on
-        if (my_mac_addr == PAN_COORDINATOR_MAC_ADDR)
+        // Wait a bit before proceeding to make sure all the anchors have receiver switched on
+        if (app_init_obj.mac_addr == PAN_COORDINATOR_MAC_ADDR)
         {
             app_sleep(GUARD_TIME);
         }
 
         // Run ranging session
-        app_run_ieee_802_15_4_schedule();
+        app_run_ieee_802_15_4z_schedule();
 
-        // Read ranging session results
-        app_get_ranging_info(&ranging_info);
+        // Read ranging session logs
+        app_read_log_info(&app_log_info);
         
         // Compute distances (m)
-        for (int k = 0; k < num_anchors; k++)
+        for (int k = 0; k < NUM_LEDS; k++)
         {
-            dist[k] = LIGHT_SPEED * DWT_TIME_UNITS * ranging_info.dist[k];
-        }
-
-        // Set LEDs states if tag is too close to the anchors
-        for (int k = 0; k < num_anchors; k++)
-        {
-            if (dist[k] < ALERT_DIST && dist[k] > 0 && my_mac_addr == PAN_COORDINATOR_MAC_ADDR)
-            {
-                led_state[k] = true;
-            }
+            dist[k] = LIGHT_SPEED * DWT_TIME_UNITS * app_log_info.dist[k];
         }
 
         // Switch on LEDs
-        for (int k = 0; k < num_anchors; k++)
+        for (int k = 0; k < NUM_LEDS; k++)
         {
-            led_gpio_write(led_id[k], led_state[k]);
+            if (dist[k] < ALERT_DIST &&
+                dist[k] > 0 &&
+                app_init_obj.mac_addr == PAN_COORDINATOR_MAC_ADDR)
+            {
+                led_gpio_write(led_id[k], true);
+            }
         }
         
         // Sleep while LEDs are ON
         app_sleep(BLINK_TIME);
 
-        // Reset LEDs states
-        for (int k = 0; k < num_anchors; k++)
-        {
-            led_state[k] = false;
-        }
-
         // Switch off LEDs
-        for (int k = 0; k < num_anchors; k++)
+        for (int k = 0; k < NUM_LEDS; k++)
         {
-            led_gpio_write(led_id[k], led_state[k]);
+            if (dist[k] < ALERT_DIST &&
+                dist[k] > 0 &&
+                app_init_obj.mac_addr == PAN_COORDINATOR_MAC_ADDR)
+            {
+                led_gpio_write(led_id[k], false);
+            }
         }
         
         // Sleep while LEDs are OFF

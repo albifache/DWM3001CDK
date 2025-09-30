@@ -14,134 +14,187 @@
 #include <zephyr/sys/printk.h>
 
 
-#define PRECAL_TX_POWER                 0
-#define PRECAL_ANT_DELAY                0
+#define RF_CHAN                                 5                           // UWB channel (5 or 9)
+#define PREAMBLE_CODE                           9                           // Preamble code
+#define BIT_RATE                                DWT_BR_850K                 // UWB bit rate
+#define PREAMBLE_LEN                            DWT_PLEN_1024               // Preamble length (number of symbols)
+#define STS_LEN                                 DWT_STS_LEN_1024            // STS length (number of symbols)
 
-#define GUARD_TIME                      10                  // Guard time (ms)
-#define SLEEP_TIME                      1000                // Sleeping time (ms)
+#define MAC_ADDR                                0x00u                       // MAC address of current node
+#define PAN_ID                                  0x00u                       // PAN ID of current network
 
-#define LIGHT_SPEED                     2.99702547e8f       // Speed of light (m/s)
+#define STS_KEY_0                               0ul                         // STS key (bits 0-31)
+#define STS_KEY_1                               0ul                         // STS key (bits 32-63)
+#define STS_KEY_2                               0ul                         // STS key (bits 64-95)
+#define STS_KEY_3                               0ul                         // STS key (bits 96-127)
+
+#define AES_KEY_0                               0ul                         // AES key (bits 0-31)
+#define AES_KEY_1                               0ul                         // AES key (bits 32-63)
+#define AES_KEY_2                               0ul                         // AES key (bits 64-95)
+#define AES_KEY_3                               0ul                         // AES key (bits 96-127)
+
+#define NUM_NODES                               6                           // Number of nodes (max 8)
+
+#define NODE_MAC_ADDR_0                         0x00                        // MAC address of node 0
+#define NODE_MAC_ADDR_1                         0x01                        // MAC address of node 1
+#define NODE_MAC_ADDR_2                         0x03                        // MAC address of node 2
+#define NODE_MAC_ADDR_3                         0x06                        // MAC address of node 3
+#define NODE_MAC_ADDR_4                         0x07                        // MAC address of node 4
+#define NODE_MAC_ADDR_5                         0x09                        // MAC address of node 5
+#define NODE_MAC_ADDR_6                         0                           // MAC address of node 6 (unused in this case)
+#define NODE_MAC_ADDR_7                         0                           // MAC address of node 7 (unused in this case)
+
+#define GUARD_TIME                              10                          // Guard time (ms)
+#define SLEEP_TIME                              1000                        // Sleeping time (ms)
+
+#define LIGHT_SPEED                             2.99702547e8f               // Speed of light (m/s)
 
 
-static uint16_t my_mac_addr = 0x00;
-static uint16_t my_pan_id = 0x00;
+static phy_init_obj_t phy_init_obj;
 
-static uint16_t node_mac_addr[] = {PAN_COORDINATOR_MAC_ADDR, 0x01, 0x03, 0x06, 0x07, 0x09};
-static uint8_t num_nodes = sizeof(node_mac_addr) / sizeof(uint16_t);
+static app_init_obj_t app_init_obj;
+static app_ctrl_obj_t app_ctrl_obj;
+static app_log_info_t app_log_info;
+
+static uint16_t node_mac_addr[MAX_NUM_ANCHORS];
 static uint8_t node_id = 0;
 
-static app_ranging_info_t ranging_info;
 static float dist[MAX_NUM_ANCHORS];
-
-static uint16_t ant_delay = PRECAL_ANT_DELAY ;
-static uint32_t tx_power = PRECAL_TX_POWER;
-static dwt_config_t config =
-{
-    .chan = 5,
-    .txPreambLength = DWT_PLEN_1024,
-    .rxPAC = DWT_PAC16,
-    .txCode = 9,
-    .rxCode = 9,
-    .sfdType = DWT_SFD_IEEE_4A,
-    .dataRate = DWT_BR_850K,
-    .phrMode = DWT_PHRMODE_STD,
-    .phrRate = DWT_PHRRATE_STD,
-    .sfdTO = 1025,
-    .stsMode = DWT_STS_MODE_OFF,
-    .stsLength = DWT_STS_LEN_64,
-    .pdoaMode = DWT_PDOA_M0
-};
 
 
 int main (void)
 {
     int ret;
 
-    // Initialize DW3000 IC
-    ret = phy_device_init();
-    if (ret != PHY_SUCCESS)
+    // Initialize LEDs
+    ret = led_gpio_init();
+    if (ret != PORT_SUCCESS)
     {
-        printk("\nDW3000 initialization failed.\n");
+        printk("\n[ERROR] LEDs initialization failed.\n");
         while(1);
     }
-    else
-    {
-        printk("\nDW3000 initialization successful.\n");
-    }
-
-    // Configure DW3000 IC
-    ret = phy_set_config(&config);
-    if (ret != PHY_SUCCESS)
-    {
-        printk("\nDW3000 configuration failed.\n");
-        while(1);
-    }
-    else
-    {
-        printk("\nDW3000 configuration successful.\n");
-    }
-
-    // Set TX power
-    phy_set_tx_power(tx_power);
     
-    // Set antenna delay
-    phy_set_ant_delay(ant_delay);
-
-    // Check MAC errors
-    if (num_nodes > MAX_NUM_ANCHORS || my_mac_addr == BROADCAST_MAC_ADDR || my_pan_id == BROADCAST_PAN_ID)
+    // Initialize DW3000 IC
+    ret = deca_init();
+    if (ret != PORT_SUCCESS)
     {
-        printk("\nMAC configuration error.\n");
+        printk("\n[ERROR] DW3000 initialization failed.\n");
         while(1);
     }
-    else
+
+    // Set PHY parameters
+    phy_init_obj.rf_chan = RF_CHAN;
+    phy_init_obj.preamble_code = PREAMBLE_CODE;
+    phy_init_obj.preamble_len = PREAMBLE_LEN;
+    phy_init_obj.bit_rate = BIT_RATE;
+    phy_init_obj.sts_len = STS_LEN;
+
+    // Initialize PHY
+    ret = phy_init(&phy_init_obj);
+    if (ret != PHY_SUCCESS)
     {
-        printk("\nMAC configuration successful.\n");
+        printk("\n[ERROR] DW3000 configuration failed.\n");
+        while(1);
     }
 
-    // set MAC address
-    app_set_mac_addr(my_mac_addr);
+    // Set MAC address
+    app_init_obj.mac_addr = MAC_ADDR;
 
-    // set PAN ID
-    app_set_pan_id(my_pan_id);
+    // Set PAN ID
+    app_init_obj.pan_id = PAN_ID;
 
-    // Set anchors MAC addresses
-    app_set_anchor_mac_addr(node_mac_addr, num_nodes);
+    // Set STS key (128 bits)
+    app_init_obj.sts_key.key0 = STS_KEY_0;
+    app_init_obj.sts_key.key1 = STS_KEY_1;
+    app_init_obj.sts_key.key2 = STS_KEY_2;
+    app_init_obj.sts_key.key3 = STS_KEY_3;
+
+    // Set AES key (128 bits)
+    app_init_obj.aes_key.key0 = AES_KEY_0;
+    app_init_obj.aes_key.key1 = AES_KEY_1;
+    app_init_obj.aes_key.key2 = AES_KEY_2;
+    app_init_obj.aes_key.key3 = AES_KEY_3;
+    app_init_obj.aes_key.key4 = 0;
+    app_init_obj.aes_key.key5 = 0;
+    app_init_obj.aes_key.key6 = 0;
+    app_init_obj.aes_key.key7 = 0;
+
+    // Check if initialization parameters are valid
+    if (app_init_obj.mac_addr == BROADCAST_MAC_ADDR ||
+        app_init_obj.pan_id == BROADCAST_PAN_ID)
+    {
+        printk("\n[ERROR] App initialization failed.\n");
+        while(1);
+    }
+
+    // Initialize app
+    app_init(&app_init_obj);
+
+    // Set number of anchors
+    app_ctrl_obj.num_anchors = NUM_NODES;
+
+    // Set nodes MAC addresses
+    node_mac_addr[0] = NODE_MAC_ADDR_0;
+    node_mac_addr[1] = NODE_MAC_ADDR_1;
+    node_mac_addr[2] = NODE_MAC_ADDR_2;
+    node_mac_addr[3] = NODE_MAC_ADDR_3;
+    node_mac_addr[4] = NODE_MAC_ADDR_4;
+    node_mac_addr[5] = NODE_MAC_ADDR_5;
+    node_mac_addr[6] = NODE_MAC_ADDR_6;
+    node_mac_addr[7] = NODE_MAC_ADDR_7;
+    for (int k = 0; k < NUM_NODES; k++)
+    {
+        app_ctrl_obj.anchor_mac_addr[k] = node_mac_addr[k];
+    }
+
+    // Check if number of anchors is valid
+    if (app_ctrl_obj.num_anchors > MAX_NUM_ANCHORS)
+    {
+        printk("\n[ERROR] Total number of anchors should not exceed %d.\n", MAX_NUM_ANCHORS);
+        while(1);
+    }
+
+    // Set app runtime parameters
+    app_set_ctrl_params(&app_ctrl_obj);
 
     // Begin loop
     while (1)
     {
         // Wait a bit before proceeding to make sure anchors have receiver switched on
-        if (my_mac_addr == PAN_COORDINATOR_MAC_ADDR)
+        if (MAC_ADDR == PAN_COORDINATOR_MAC_ADDR)
         {
             app_sleep(GUARD_TIME);
         }
 
-        // Wait a bit before proceeding to make sure anchors have receiver switched on
-        if (my_mac_addr == PAN_COORDINATOR_MAC_ADDR)
+        // Select which node will operate as tag
+        if (MAC_ADDR == PAN_COORDINATOR_MAC_ADDR)
         {
             node_id++;
-            node_id %= num_nodes;
-            app_set_tag_mac_addr(node_mac_addr[node_id]);
+            node_id %= NUM_NODES;
+            app_ctrl_obj.tag_mac_addr = node_mac_addr[node_id];
+            app_set_ctrl_params(&app_ctrl_obj);
         }
 
         // Run ranging session
-        app_run_ieee_802_15_4_schedule();
+        app_run_ieee_802_15_4z_schedule();
 
         // Read ranging session results
-        app_get_ranging_info(&ranging_info);
+        app_read_log_info(&app_log_info);
         
         // Compute distances (m)
-        for (int k = 0; k < num_nodes; k++)
+        for (int k = 0; k < NUM_NODES; k++)
         {
-            dist[k] = DWT_TIME_UNITS * LIGHT_SPEED * ranging_info.dist[k];
+            dist[k] = DWT_TIME_UNITS * LIGHT_SPEED * app_log_info.dist[k];
         }
 
         // Print log message on console
-        printk("\n\n\n\n\n\nRanging session %u completed.\n\n", ranging_info.superframe_id);
-        for (int k = 0; k < num_nodes; k++)
+        printk("\n\n\n\n\n\nRanging session %llu completed.\n\n", app_log_info.superframe_id);
+        for (int k = 0; k < NUM_NODES; k++)
         {
             printk("\tDistance from node 0x%02X to node 0x%02X: %.2f m.\n",
-                node_mac_addr[node_id], node_mac_addr[k], (double) dist[k]);
+                    node_mac_addr[node_id],
+                    node_mac_addr[k],
+                    (double) dist[k]);
         }
         
         // Sleep till next superframe

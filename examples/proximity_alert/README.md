@@ -2,7 +2,13 @@
 
 ## License
 
-This project is distributed under the **GNU AGPL v3.0 License** (Check [LICENSE](../../LICENSE) file for details). If you need a different license please contact the author via [LinkedIn](https://www.linkedin.com/in/alberto-facheris-9028ab357/) or [E-mail](mailto:albi97.fache@gmail.com)
+This project is distributed under the **GNU AGPL v3.0 License** (Check [LICENSE](../../LICENSE) file for details). If you need a different license, please contact the author via [LinkedIn](https://www.linkedin.com/in/alberto-facheris-9028ab357/) or [E-mail](mailto:albi97.fache@gmail.com)
+
+## Disclaimer
+
+This software is provided "as is", without warranty of any kind, express or implied. The author shall not be liable for any damages, security issues, or malfunctions arising from the use of this software. Users are responsible for testing and validating the software for their specific use cases, especially in safety-critical or security-sensitive applications.
+
+This project is intended for educational and research purposes. For production deployments, additional security audits and testing are strongly recommended.
 
 ## Overview
 
@@ -10,9 +16,9 @@ This example implements a proximity sensor where 1 tag equipped with 4 LEDs rang
 
 ## Building and Flashing
 
-### 1. Clone The Repository
+### 1. Clone the Repository
 
-Clone the repository if you still haven't. Then navigate to this example folder (examples/smart_proximity_alert)
+Clone the repository if you still haven't. Then navigate to this example folder.
 
 ```bash
 cd ~/zephyrproject/zephyr/samples
@@ -43,29 +49,41 @@ west flash -r jlink
 
 ## Configuration
 
-The example is configured to operate with:
-- **One tag** (MAC address 0x00) 
-- **Two anchors** (MAC addresses 0x06 and 0x07)
-- **PAN ID** set to 0x00 (must be the same for all nodes)
-- **Alert distance** set to 1 m
-- **LED mapping**: 
-  - LED 3 (blue) blinks for anchor node 0x06
-  - LED 1 (red) blinks for anchor node 0x07
-  - LED 0 is green, LEDs 1-2 are red, LED 3 is blue
-
-### Customizing Configuration
-
-Edit the main configuration in `main.c`:
+Edit the main configuration in `main.c`. Parameters can be modified but must be fixed for all the nodes apart from MAC_ADDR.
 
 ```c
-#define BLUE_LED        3                             // LED ID (0 to 3)
-#define RED_LED         1                             // LED ID (0 to 3)  
-#define ALERT_DIST      1.0f                          // Alert distance in meters
+#define RF_CHAN                                 5                           // UWB channel (5 or 9)
+#define PREAMBLE_CODE                           9                           // Preamble code
+#define BIT_RATE                                DWT_BR_850K                 // UWB bit rate
+#define PREAMBLE_LEN                            DWT_PLEN_1024               // Preamble length (number of symbols)
+#define STS_LEN                                 DWT_STS_LEN_1024            // STS length (number of symbols)
 
-static uint16_t my_mac_addr = 0x00;                   // MAC address of this node
-static uint16_t my_pan_id = 0x00;                     // PAN ID for all nodes
-static uint16_t anchor_mac_addr[] = {0x06, 0x07};     // MAC addresses of anchor nodes
-static uint16_t led_id[] = {BLUE_LED, RED_LED};       // LEDs associated to anchor nodes
+#define MAC_ADDR                                0x00u                       // MAC address of current node
+#define PAN_ID                                  0x00u                       // PAN ID of current network
+
+#define STS_KEY_0                               0ul                         // STS key (bits 0-31)
+#define STS_KEY_1                               0ul                         // STS key (bits 32-63)
+#define STS_KEY_2                               0ul                         // STS key (bits 64-95)
+#define STS_KEY_3                               0ul                         // STS key (bits 96-127)
+
+#define AES_KEY_0                               0ul                         // AES key (bits 0-31)
+#define AES_KEY_1                               0ul                         // AES key (bits 32-63)
+#define AES_KEY_2                               0ul                         // AES key (bits 64-95)
+#define AES_KEY_3                               0ul                         // AES key (bits 96-127)
+
+#define NUM_ANCHORS                             2                           // Number of anchors (max 4)
+
+#define ANCHOR_MAC_ADDR_0                       0x06                        // MAC address of anchor 0
+#define ANCHOR_MAC_ADDR_1                       0x07                        // MAC address of anchor 1
+#define ANCHOR_MAC_ADDR_2                       0x00                        // MAC address of anchor 2 (unused in this case)
+#define ANCHOR_MAC_ADDR_3                       0x00                        // MAC address of anchor 3 (unused in this case)
+
+#define GREEN_LED                               0                           // LED that blinks when tag is too close to anchor 0
+#define RED_LED_0                               1                           // LED that blinks when tag is too close to anchor 1
+#define RED_LED_1                               2                           // LED that blinks when tag is too close to anchor 2
+#define BLUE_LED                                3                           // LED that blinks when tag is too close to anchor 3
+
+#define ALERT_DIST                              1.0f                        // Alert distance (m)
 ```
 
 ## Debugging

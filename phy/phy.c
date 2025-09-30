@@ -8,31 +8,8 @@
 #include "../deca_driver/deca_device_api.h"
 #include "../port/deca_probe_interface.h"
 #include "../port/port.h"
+//#include <zephyr/sys/printk.h>
 
-
-#define OTP_ADDR_CHIP_ID                        0x06u
-#define OTP_ADDR_LOT_ID_LO                      0x0Du
-#define OTP_ADDR_LOT_ID_HI                      0x0Eu
-
-#define OTP_ADDR_TX_POWER_CH5_PRF16             0x10u
-#define OTP_ADDR_TX_POWER_CH5_PRF64             0x11u
-#define OTP_ADDR_TX_POWER_CH9_PRF16             0x12u
-#define OTP_ADDR_TX_POWER_CH9_PRF64             0x13u 
-
-#define OTP_ADDR_TX_ANT_DELAY_CH5_PRF16         0x1Bu
-#define OTP_ADDR_TX_ANT_DELAY_CH5_PRF64         0x1Au
-#define OTP_ADDR_TX_ANT_DELAY_CH9_PRF16         0x1Du
-#define OTP_ADDR_TX_ANT_DELAY_CH9_PRF64         0x1Cu
-
-#define OTP_ADDR_RX_ANT_DELAY_CH5_PRF16         0x1Bu
-#define OTP_ADDR_RX_ANT_DELAY_CH5_PRF64         0x1Au
-#define OTP_ADDR_RX_ANT_DELAY_CH9_PRF16         0x1Du
-#define OTP_ADDR_RX_ANT_DELAY_CH9_PRF64         0x1Cu
-
-#define TX_ANT_DELAY_MASK                       0xFFFFul
-#define RX_ANT_DELAY_MASK                       0xFFFF0000ul
-#define TX_ANT_DELAY_OFFSET                     0
-#define RX_ANT_DELAY_OFFSET                     16
 
 #define DEFAULT_PG_DELAY                        0x34
 #define DEFAULT_PG_COUNT                        0x00
@@ -44,242 +21,47 @@
 #define DEFAULT_TX_POWER_CH9                    0xFEFEFEFEul
 
 
-static uint32_t device_id = 0;
-
-static uint32_t chip_id = 0;
-
-static uint32_t lot_id_lo = 0;
-static uint32_t lot_id_hi = 0;
-static uint64_t lot_id = 0;
-
-static uint32_t tx_ant_delay = DEFAULT_TX_ANT_DELAY;
-static uint32_t rx_ant_delay = DEFAULT_RX_ANT_DELAY;
-
-
-static dwt_config_t config =
+int phy_init (phy_init_obj_t *obj)
 {
-    .chan = 5,
-    .txPreambLength = DWT_PLEN_1024,
-    .rxPAC = DWT_PAC16,
-    .txCode = 9,
-    .rxCode = 9,
-    .sfdType = DWT_SFD_IEEE_4A,
-    .dataRate = DWT_BR_850K,
-    .phrMode = DWT_PHRMODE_STD,
-    .phrRate = DWT_PHRRATE_STD,
-    .sfdTO = 1025,
-    .stsMode = DWT_STS_MODE_OFF,
-    .stsLength = DWT_STS_LEN_64,
-    .pdoaMode = DWT_PDOA_M0
-};
+    int ret;
 
-
-static dwt_txconfig_t txconfig =
-{
-    .PGdly = DEFAULT_PG_DELAY,
-    .power = DEFAULT_TX_POWER_CH5,
-    .PGcount = DEFAULT_PG_COUNT
-};
-
-
-static uint32_t phy_read_tx_power_from_otp (void);
-static uint16_t phy_read_tx_ant_delay_from_otp (void);
-static uint16_t phy_read_rx_ant_delay_from_otp (void);
-
-
-static uint32_t phy_read_tx_power_from_otp (void)
-{
-    uint32_t buf[1];
-    uint32_t tx_power_from_otp;
-
-    // Channel 5
-    if (config.chan == 5)
-    {
-        // PRF 64 MHz
-        if (config.txCode >= 9 && config.txCode <= 24)
-        {
-            dwt_otpread(OTP_ADDR_TX_POWER_CH5_PRF64, buf, 1);
-        }
-
-        // PRF 16 MHz
-        else if (config.txCode >= 1 && config.txCode <= 8)
-        {
-            dwt_otpread(OTP_ADDR_TX_POWER_CH5_PRF16, buf, 1);
-        }
-    }
-    
-    // Channel 9
-    if (config.chan == 9)
-    {
-        // PRF 64 MHz
-        if (config.txCode >= 9 && config.txCode <= 24)
-        {
-            dwt_otpread(OTP_ADDR_TX_POWER_CH9_PRF64, buf, 1);
-        }
-
-        // PRF 16 MHz
-        else if (config.txCode >= 1 && config.txCode <= 8)
-        {
-            dwt_otpread(OTP_ADDR_TX_POWER_CH9_PRF16, buf, 1);
-        }
-    }
-
-    // Copy TX power from OTP
-    tx_power_from_otp = buf[0];
-
-    return tx_power_from_otp;
-}
-
-
-static uint16_t phy_read_tx_ant_delay_from_otp (void)
-{
-    uint32_t buf[1];
-    uint32_t tx_ant_delay_from_otp;
-
-    // Channel 5
-    if (config.chan == 5)
-    {
-        // PRF 64 MHz
-        if (config.txCode >= 9 && config.txCode <= 24)
-        {
-            dwt_otpread(OTP_ADDR_TX_ANT_DELAY_CH5_PRF64, buf, 1);
-        }
-
-        // PRF 16 MHz
-        else if (config.txCode >= 1 && config.txCode <= 8)
-        {
-            dwt_otpread(OTP_ADDR_TX_ANT_DELAY_CH5_PRF16, buf, 1);
-        }
-    }
-
-    // Channel 9
-    else if (config.chan == 9)
-    {
-        // PRF 64 MHz
-        if (config.txCode >= 9 && config.txCode <= 24)
-        {
-            dwt_otpread(OTP_ADDR_TX_ANT_DELAY_CH9_PRF64, buf, 1);
-        }
-
-        // PRF 16 MHz
-        else if (config.txCode >= 1 && config.txCode <= 8)
-        {
-            dwt_otpread(OTP_ADDR_TX_ANT_DELAY_CH9_PRF16, buf, 1);
-        }
-    }
-
-    // Copy TX antenna delay from OTP
-    tx_ant_delay_from_otp = buf[0] & TX_ANT_DELAY_MASK;
-    tx_ant_delay_from_otp >>= TX_ANT_DELAY_OFFSET;
-
-    return tx_ant_delay_from_otp;
-}
-
-
-static uint16_t phy_read_rx_ant_delay_from_otp (void)
-{
-    uint32_t buf[1];
-    uint32_t rx_ant_delay_from_otp;
-
-    // Channel 5
-    if (config.chan == 5)
-    {
-        // PRF 64 MHz
-        if (config.txCode >= 9 && config.txCode <= 24)
-        {
-            dwt_otpread(OTP_ADDR_RX_ANT_DELAY_CH5_PRF64, buf, 1);
-        }
-
-        // PRF 16 MHz
-        else if (config.txCode >= 1 && config.txCode <= 8)
-        {
-            dwt_otpread(OTP_ADDR_RX_ANT_DELAY_CH5_PRF16, buf, 1);
-        }
-    }
-
-    // Channel 9
-    else if (config.chan == 9)
-    {
-        // PRF 64 MHz
-        if (config.txCode >= 9 && config.txCode <= 24)
-        {
-            dwt_otpread(OTP_ADDR_RX_ANT_DELAY_CH9_PRF64, buf, 1);
-        }
-
-        // PRF 16 MHz
-        else if (config.chan == 9 && config.txCode >= 1 && config.txCode <= 8)
-        {
-            dwt_otpread(OTP_ADDR_RX_ANT_DELAY_CH9_PRF16, buf, 1);
-        }
-    }
-
-    // Copy RX antenna delay from OTP
-    rx_ant_delay_from_otp = buf[0] & RX_ANT_DELAY_MASK;
-    rx_ant_delay_from_otp >>= RX_ANT_DELAY_OFFSET;
-
-    return rx_ant_delay_from_otp;
-}
-
-
-int phy_device_init (void)
-{
-    // Initialize the peripherals
-    deca_gpio_init();
-    deca_spi_init();
-
-    // Reset DW3000 IC
-    deca_reset_ic();
-
-    // Probe for the correct device driver
-    dwt_probe((struct dwt_probe_s *)&dw3000_probe_interf);
-
-    // Make sure DW3000 IC is in IDLE_RC before proceeding
-    while (!dwt_checkidlerc());
-
-    // Initialise DW3000 IC
-    int ret = dwt_initialise(DWT_DW_INIT);
-    if (ret != DWT_SUCCESS)
+    // Check if DW3000 IC has been successfully initialized
+    bool deca_init_done = deca_init_check();
+    if (!deca_init_done)
     {
         return PHY_INIT_ERROR;
     }
 
-    // Read device ID
-    device_id = dwt_readdevid();
+    // Read OTP parameters
+    deca_hw_info_t info;
+    deca_read_device_info(&info);
 
-    // Check if device ID is valid
-    if (device_id != DWT_DW3000_DEV_ID &&
-        device_id != DWT_QM33110_DEV_ID &&
-        device_id != DWT_DW3000_PDOA_DEV_ID &&
-        device_id!= DWT_QM33120_PDOA_DEV_ID)
+    // Set default config values
+    dwt_config_t config;
+    config.sfdType = DWT_SFD_IEEE_4Z;
+    config.phrMode = DWT_PHRMODE_STD;
+    config.phrRate = DWT_PHRRATE_STD;
+    config.stsMode = DWT_STS_MODE_1;
+    config.pdoaMode = DWT_PDOA_M0;
+
+    // Check if channel is valid
+    if (obj->rf_chan != 5 && obj->rf_chan != 9)
     {
         return PHY_INIT_ERROR;
     }
 
-    uint32_t buf[1];
+    // Set channel
+    config.chan = obj->rf_chan;
 
-    // Read chip ID (manually cause Qorvo API is bugged here)
-    dwt_otpread(OTP_ADDR_CHIP_ID, buf, 1);
-    chip_id = buf[0];
+    // Check if preamble code is valid
+    if (obj->preamble_code <= 0 || obj->preamble_code > 24)
+    {
+        return PHY_INIT_ERROR;
+    }
 
-    // Read lot ID (low order bits)
-    dwt_otpread(OTP_ADDR_LOT_ID_LO, buf, 1);
-    lot_id_lo = buf[0];
-
-    // Read lot ID (high order bits)
-    dwt_otpread(OTP_ADDR_LOT_ID_HI, buf, 1);
-    lot_id_hi = buf[0];
-
-    // Compute lot ID
-    lot_id = ((uint64_t) lot_id_lo) | (((uint64_t) lot_id_hi) << 32);
-
-    return PHY_SUCCESS;    
-}
-
-
-int phy_set_config (dwt_config_t* new_config)
-{
-    // Update configuration
-    config = *new_config;
+    // Set preamble code
+    config.txCode = obj->preamble_code;
+    config.rxCode = obj->preamble_code;
 
     // Compute SFD length
     uint16_t sfd_len = 8;
@@ -288,10 +70,10 @@ int phy_set_config (dwt_config_t* new_config)
         sfd_len = 16;
     }
 
-    // Set preamble length and PAC size
-    uint16_t tx_pr_len = 4096;
+    // Compute preamble length and PAC size
+    uint16_t tx_pr_len = 32;
     uint16_t pac_size = 4;
-    switch (config.txPreambLength)
+    switch (obj->preamble_len)
     {
         case DWT_PLEN_32:
             tx_pr_len = 32;
@@ -352,115 +134,150 @@ int phy_set_config (dwt_config_t* new_config)
             pac_size = 32;
             config.rxPAC = DWT_PAC32;
         break;
+
+        default:
+            return PHY_INIT_ERROR;
+        break;
     }
+
+    // Set preamble length
+    config.txPreambLength = obj->preamble_len;
 
     // Set SFD timeout
     config.sfdTO = tx_pr_len + sfd_len + 1 - pac_size;
 
+    // Check if bit rate is valid
+    if (obj->bit_rate != DWT_BR_850K && obj->bit_rate != DWT_BR_6M8)
+    {
+        return PHY_INIT_ERROR;
+    }
+
+    // Set bit rate
+    config.dataRate = obj->bit_rate;
+
+    // Check if STS length is valid
+    if (obj->sts_len != DWT_STS_LEN_32 &&
+        obj->sts_len != DWT_STS_LEN_64 &&
+        obj->sts_len != DWT_STS_LEN_128 &&
+        obj->sts_len != DWT_STS_LEN_256 &&
+        obj->sts_len != DWT_STS_LEN_512 &&
+        obj->sts_len != DWT_STS_LEN_1024 &&
+        obj->sts_len != DWT_STS_LEN_2048)
+    {
+        return PHY_INIT_ERROR;
+    }
+
+    // Set STS length
+    config.stsLength = obj->sts_len;
+
     // Configure DW3000 IC, if either the PLL or RX calibration has failed the host should reset the device
-    int ret = dwt_configure(&config);
+    ret = dwt_configure(&config);
     if (ret != DWT_SUCCESS)
     {
-        return PHY_CONFIG_ERROR;
+        return PHY_INIT_ERROR;
     }
 
     // Disable timeouts
     dwt_setrxtimeout(0);
     dwt_setpreambledetecttimeout(0);
 
-    return PHY_SUCCESS;
-}
-
-
-int phy_set_tx_power (uint32_t tx_power)
-{
-    int ret = PHY_SUCCESS;
-
-    // Automatically select TX power
-    if (tx_power == 0)
+    // Read TX power from OTP
+    uint32_t tx_power = DEFAULT_TX_POWER_CH5;
+    if (obj->rf_chan == 5)
     {
-        uint32_t tx_power_from_otp = phy_read_tx_power_from_otp();
-
-        // Check if TX power is precalibrated
-        if (tx_power_from_otp != 0)
+        if (obj->preamble_code >= 9 && obj->preamble_code <= 24)
         {
-            tx_power = tx_power_from_otp;
-            ret = PHY_SUCCESS;
+            tx_power = info.tx_power_ch5_prf64;
         }
-
-        // Set default TX power if not precalibrated
-        else
+        else if (obj->preamble_code >= 1 && obj->preamble_code <= 8)
         {
-            // Channel 5
-            if (config.chan == 5)
-            {
-                tx_power = DEFAULT_TX_POWER_CH5;
-            }
-
-            // Channel 9
-            else if (config.chan == 9)
-            {
-                tx_power = DEFAULT_TX_POWER_CH9;
-            }
-
-            ret = PHY_CONFIG_WARNING;
+            tx_power = info.tx_power_ch5_prf16;
+        }
+    }
+    else if (obj->rf_chan == 9)
+    {
+        if (obj->preamble_code >= 9 && obj->preamble_code <= 24)
+        {
+            tx_power = info.tx_power_ch9_prf64;
+        }
+        else if (obj->preamble_code >= 1 && obj->preamble_code <= 8)
+        {
+            tx_power = info.tx_power_ch9_prf16;
         }
     }
 
-    // Configure the TX parameters (power, PG delay and PG count)
+    // Check if TX power was precalibrated
+    if (tx_power == 0)
+    {
+        return PHY_INIT_ERROR;
+    }
+
+    // Set TX parameters (power, PG delay and PG count)
+    dwt_txconfig_t txconfig;
     txconfig.PGdly = DEFAULT_PG_DELAY;
     txconfig.power = tx_power;
     txconfig.PGcount = DEFAULT_PG_COUNT;
     dwt_configuretxrf(&txconfig);
 
-    return ret;
-}
-
-
-int phy_set_ant_delay (uint16_t ant_delay)
-{
-    int ret = PHY_SUCCESS;
-
-    // Manually select antenna delay
-    rx_ant_delay = ant_delay;
-    tx_ant_delay = ant_delay;
-
-    // Automatically select antenna delay
-    if (ant_delay == 0)
+    // Read TX antenna delay from OTP
+    uint16_t tx_ant_delay = DEFAULT_TX_ANT_DELAY;
+    if (obj->rf_chan == 5)
     {
-        uint16_t rx_ant_delay_from_otp = phy_read_rx_ant_delay_from_otp();
-        uint16_t tx_ant_delay_from_otp = phy_read_tx_ant_delay_from_otp();
-
-        // Check if antenna delay is precalibrated
-        if (rx_ant_delay_from_otp != 0 || tx_ant_delay_from_otp != 0)
+        if (obj->preamble_code >= 9 && obj->preamble_code <= 24)
         {
-            rx_ant_delay = rx_ant_delay_from_otp;
-            tx_ant_delay = tx_ant_delay_from_otp;
-            ret = PHY_SUCCESS;
+            tx_ant_delay = info.tx_antd_ch5_prf64;
         }
-
-        // Set default antenna delay if not precalibrated
-        else
+        else if (obj->preamble_code >= 1 && obj->preamble_code <= 8)
         {
-            rx_ant_delay = DEFAULT_RX_ANT_DELAY;
-            tx_ant_delay = DEFAULT_TX_ANT_DELAY;
-            ret = PHY_CONFIG_WARNING;
-        }   
+            tx_ant_delay = info.tx_antd_ch5_prf16;
+        }
+    }
+    else if (obj->rf_chan == 9)
+    {
+        if (obj->preamble_code >= 9 && obj->preamble_code <= 24)
+        {
+            tx_ant_delay = info.tx_antd_ch9_prf64;
+        }
+        else if (obj->preamble_code >= 1 && obj->preamble_code <= 8)
+        {
+            tx_ant_delay = info.tx_antd_ch9_prf16;
+        }
+    }
+
+    // Read RX antenna delay from OTP
+    uint16_t rx_ant_delay = DEFAULT_RX_ANT_DELAY;
+    if (obj->rf_chan == 5)
+    {
+        if (obj->preamble_code >= 9 && obj->preamble_code <= 24)
+        {
+            rx_ant_delay = info.rx_antd_ch5_prf64;
+        }
+        else if (obj->preamble_code >= 1 && obj->preamble_code <= 8)
+        {
+            rx_ant_delay = info.rx_antd_ch5_prf16;
+        }
+    }
+    else if (obj->rf_chan == 9)
+    {
+        if (obj->preamble_code >= 9 && obj->preamble_code <= 24)
+        {
+            rx_ant_delay = info.rx_antd_ch9_prf64;
+        }
+        else if (obj->preamble_code >= 1 && obj->preamble_code <= 8)
+        {
+            rx_ant_delay = info.rx_antd_ch9_prf16;
+        }
+    }
+
+    // Check if antenna delay was precalibrated
+    if (rx_ant_delay == 0 && tx_ant_delay == 0)
+    {
+        return PHY_INIT_ERROR;
     }
 
     // Set antenna delay
     dwt_setrxantennadelay(rx_ant_delay + tx_ant_delay);
     dwt_settxantennadelay(0);
 
-    return ret;
-}
-
-
-void phy_get_device_info (phy_device_info_t* device_info)
-{
-    device_info->dev_id = device_id;
-    device_info->chip_id = chip_id;
-    device_info->lot_id = lot_id;
-
-    return;
+    return PHY_SUCCESS;
 }

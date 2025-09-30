@@ -1,8 +1,14 @@
-# Proximity Alert
+# Multi-node Ranging
 
 ## License
 
-This project is distributed under the **GNU AGPL v3.0 License** (Check [LICENSE](../../LICENSE) file for details). If you need a different license please contact the author via [LinkedIn](https://www.linkedin.com/in/alberto-facheris-9028ab357/) or [E-mail](mailto:albi97.fache@gmail.com)
+This project is distributed under the **GNU AGPL v3.0 License** (Check [LICENSE](../../LICENSE) file for details). If you need a different license, please contact the author via [LinkedIn](https://www.linkedin.com/in/alberto-facheris-9028ab357/) or [E-mail](mailto:albi97.fache@gmail.com)
+
+## Disclaimer
+
+This software is provided "as is", without warranty of any kind, express or implied. The author shall not be liable for any damages, security issues, or malfunctions arising from the use of this software. Users are responsible for testing and validating the software for their specific use cases, especially in safety-critical or security-sensitive applications.
+
+This project is intended for educational and research purposes. For production deployments, additional security audits and testing are strongly recommended.
 
 ## Overview
 
@@ -10,9 +16,9 @@ This example implements a RTLS where each node periodically ranges all the other
 
 ## Building and Flashing
 
-### 1. Clone The Repository
+### 1. Clone the Repository
 
-Clone the repository if you still haven't. Then navigate to this example folder (examples/smart_proximity_alert)
+Clone the repository if you still haven't. Then navigate to this example folder.
 
 ```bash
 cd ~/zephyrproject/zephyr/samples
@@ -43,19 +49,38 @@ west flash -r jlink
 
 ## Configuration
 
-The example is configured to operate with:
-- **Six nodes** with MAC addresses 0x00, 0x01, 0x03, 0x06, 0x07, 0x09
-- **PAN ID** set to 0x00 (must be the same for all nodes)
-
-
-### Customizing Configuration
-
-Edit the main configuration in `main.c`:
+Edit the main configuration in `main.c`. Parameters can be modified but must be fixed for all the nodes apart from MAC_ADDR.
 
 ```c
-static uint16_t my_mac_addr = 0x00;                                         // MAC address of this node
-static uint16_t my_pan_id = 0x00;                                           // PAN ID for all nodes
-static uint16_t node_mac_addr[] = {0x00, 0x01, 0x03, 0x06, 0x07, 0x09};     // MAC addresses of all the nodes
+#define RF_CHAN                                 5                           // UWB channel (5 or 9)
+#define PREAMBLE_CODE                           9                           // Preamble code
+#define BIT_RATE                                DWT_BR_850K                 // UWB bit rate
+#define PREAMBLE_LEN                            DWT_PLEN_1024               // Preamble length (number of symbols)
+#define STS_LEN                                 DWT_STS_LEN_1024            // STS length (number of symbols)
+
+#define MAC_ADDR                                0x00u                       // MAC address of current node
+#define PAN_ID                                  0x00u                       // PAN ID of current network
+
+#define STS_KEY_0                               0ul                         // STS key (bits 0-31)
+#define STS_KEY_1                               0ul                         // STS key (bits 32-63)
+#define STS_KEY_2                               0ul                         // STS key (bits 64-95)
+#define STS_KEY_3                               0ul                         // STS key (bits 96-127)
+
+#define AES_KEY_0                               0ul                         // AES key (bits 0-31)
+#define AES_KEY_1                               0ul                         // AES key (bits 32-63)
+#define AES_KEY_2                               0ul                         // AES key (bits 64-95)
+#define AES_KEY_3                               0ul                         // AES key (bits 96-127)
+
+#define NUM_NODES                               6                           // Number of nodes (max 8)
+
+#define NODE_MAC_ADDR_0                         0x00                        // MAC address of node 0
+#define NODE_MAC_ADDR_1                         0x01                        // MAC address of node 1
+#define NODE_MAC_ADDR_2                         0x03                        // MAC address of node 2
+#define NODE_MAC_ADDR_3                         0x06                        // MAC address of node 3
+#define NODE_MAC_ADDR_4                         0x07                        // MAC address of node 4
+#define NODE_MAC_ADDR_5                         0x09                        // MAC address of node 5
+#define NODE_MAC_ADDR_6                         0                           // MAC address of node 6 (unused in this case)
+#define NODE_MAC_ADDR_7                         0                           // MAC address of node 7 (unused in this case)
 ```
 
 ## Debugging

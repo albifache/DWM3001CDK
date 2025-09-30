@@ -6625,7 +6625,7 @@ static uint16_t ull_getframelength(dwchip_t *dw, uint8_t *rng_bit)
     }
 
     // Report ranging bit
-    if ((finfo16 & RX_FINFO_RNG_BIT_MASK) != 0U)
+    if ((finfo16 & RX_FINFO_RNG_BIT_MASK) != 0U && rng_bit != NULL)
     {
         *rng_bit |= (uint8_t)DWT_CB_DATA_RX_FLAG_RNG;
     }

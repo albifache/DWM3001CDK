@@ -43,7 +43,7 @@ int deca_spi_init (void)
     // Configure CS pin as output high (inactive)
     if (gpio_pin_configure(cs_gpio_dev, DW_CS_GPIO_PIN, GPIO_OUTPUT) != 0)
     {
-        return PORT_CONFIG_ERROR;
+        return PORT_INIT_ERROR;
     }
 
     // Set CS high (inactive)
