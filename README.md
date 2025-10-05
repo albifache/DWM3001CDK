@@ -77,6 +77,7 @@ DWM3001CDK/
 │   ├── deca_sleep.c                        # Blocking delays
 │   ├── deca_spi.c                          # DW3000 SPI interface
 │   ├── led_gpio.c                          # LEDs interface
+│   ├── serial_uart.c                       # UART interface (unused at the moment)
 │   └── port.h                              # Port interface
 │
 ├── examples/

@@ -25,6 +25,12 @@ int phy_init (phy_init_obj_t *obj)
 {
     int ret;
 
+    // Check if pointer is valid
+    if (obj == NULL)
+    {
+        return PHY_INIT_ERROR;
+    }
+
     // Check if DW3000 IC has been successfully initialized
     bool deca_init_done = deca_init_check();
     if (!deca_init_done)
@@ -34,7 +40,11 @@ int phy_init (phy_init_obj_t *obj)
 
     // Read OTP parameters
     deca_hw_info_t info;
-    deca_read_device_info(&info);
+    ret = deca_read_device_info(&info);
+    if (ret != PORT_SUCCESS)
+    {
+        return PHY_INIT_ERROR;
+    }
 
     // Set default config values
     dwt_config_t config;

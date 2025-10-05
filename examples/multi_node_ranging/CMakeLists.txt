@@ -33,9 +33,6 @@ set(APP_SOURCES
     ../../deca_driver/deca_rsl.c
     ../../deca_driver/deca_device.c
     ../../deca_driver/qmath.c
-
-    # LEDs
-    ../../port/led_gpio.c
 )
 
 # Add the sources to the target

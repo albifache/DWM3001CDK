@@ -121,16 +121,13 @@ int main (void)
     app_init_obj.aes_key.key6 = 0;
     app_init_obj.aes_key.key7 = 0;
 
-    // Check if initialization parameters are valid
-    if (app_init_obj.mac_addr == BROADCAST_MAC_ADDR ||
-        app_init_obj.pan_id == BROADCAST_PAN_ID)
+    // Initialize app
+    ret = app_init(&app_init_obj);
+    if (ret != APP_SUCCESS)
     {
         printk("\n[ERROR] App initialization failed.\n");
         while(1);
     }
-
-    // Initialize app
-    app_init(&app_init_obj);
 
     // Set tag MAC address
     app_ctrl_obj.tag_mac_addr = PAN_COORDINATOR_MAC_ADDR;
@@ -152,7 +149,12 @@ int main (void)
     }
 
     // Set app runtime parameters
-    app_set_ctrl_params(&app_ctrl_obj);
+    ret = app_set_ctrl_params(&app_ctrl_obj);
+    if (ret != APP_SUCCESS)
+    {
+        printk("\n[ERROR] App configuration settings are not valid.\n");
+        while(1);
+    }
 
     // Set LEDs ID table
     led_id[0] = BLUE_LED;
@@ -169,14 +171,19 @@ int main (void)
     // Begin loop
     while (1)
     {
+        #if (MAC_ADDR == PAN_COORDINATOR_MAC_ADDR)
+        
         // Wait a bit before proceeding to make sure all the anchors have receiver switched on
-        if (app_init_obj.mac_addr == PAN_COORDINATOR_MAC_ADDR)
-        {
-            app_sleep(GUARD_TIME);
-        }
+        app_sleep(GUARD_TIME);
 
+        #endif
+        
         // Run ranging session
-        app_run_ieee_802_15_4z_schedule();
+        ret = app_run_ieee_802_15_4z_schedule();
+        if (ret != APP_SUCCESS)
+        {
+            continue;
+        }
 
         // Read ranging session logs
         app_read_log_info(&app_log_info);

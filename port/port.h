@@ -98,11 +98,11 @@ int led_gpio_init (void);
 
 
 // Set or reset LED
-void led_gpio_write (uint8_t led_id, bool state);
+int led_gpio_write (uint8_t led_id, bool state);
 
 
 // Read LEDs state
-bool led_gpio_read (uint8_t led_id);
+int led_gpio_read (uint8_t led_id);
 
 
 // Initialize DW3000 IC
@@ -114,7 +114,15 @@ bool deca_init_check (void);
 
 
 // Read DW3000 IC hardcoded info
-void deca_read_device_info (deca_hw_info_t *info);
+int deca_read_device_info (deca_hw_info_t *info);
+
+
+// Initialize UART
+int serial_uart_init (void);
+
+
+// Write to serial port
+int serial_uart_write (uint8_t tx_buf[], uint16_t tx_buf_len);
 
 
 #endif

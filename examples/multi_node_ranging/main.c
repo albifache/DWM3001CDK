@@ -65,14 +65,6 @@ static float dist[MAX_NUM_ANCHORS];
 int main (void)
 {
     int ret;
-
-    // Initialize LEDs
-    ret = led_gpio_init();
-    if (ret != PORT_SUCCESS)
-    {
-        printk("\n[ERROR] LEDs initialization failed.\n");
-        while(1);
-    }
     
     // Initialize DW3000 IC
     ret = deca_init();
@@ -119,16 +111,13 @@ int main (void)
     app_init_obj.aes_key.key6 = 0;
     app_init_obj.aes_key.key7 = 0;
 
-    // Check if initialization parameters are valid
-    if (app_init_obj.mac_addr == BROADCAST_MAC_ADDR ||
-        app_init_obj.pan_id == BROADCAST_PAN_ID)
+    // Initialize app
+    ret = app_init(&app_init_obj);
+    if (ret != APP_SUCCESS)
     {
         printk("\n[ERROR] App initialization failed.\n");
         while(1);
     }
-
-    // Initialize app
-    app_init(&app_init_obj);
 
     // Set number of anchors
     app_ctrl_obj.num_anchors = NUM_NODES;
@@ -147,36 +136,40 @@ int main (void)
         app_ctrl_obj.anchor_mac_addr[k] = node_mac_addr[k];
     }
 
-    // Check if number of anchors is valid
-    if (app_ctrl_obj.num_anchors > MAX_NUM_ANCHORS)
+    // Set app runtime parameters
+    ret = app_set_ctrl_params(&app_ctrl_obj);
+    if (ret != APP_SUCCESS)
     {
-        printk("\n[ERROR] Total number of anchors should not exceed %d.\n", MAX_NUM_ANCHORS);
+        printk("\n[ERROR] App configuration settings are not valid.\n");
         while(1);
     }
-
-    // Set app runtime parameters
-    app_set_ctrl_params(&app_ctrl_obj);
 
     // Begin loop
     while (1)
     {
+        #if (MAC_ADDR == PAN_COORDINATOR_MAC_ADDR)
+        
         // Wait a bit before proceeding to make sure anchors have receiver switched on
-        if (MAC_ADDR == PAN_COORDINATOR_MAC_ADDR)
-        {
-            app_sleep(GUARD_TIME);
-        }
-
+        app_sleep(GUARD_TIME);
+        
         // Select which node will operate as tag
-        if (MAC_ADDR == PAN_COORDINATOR_MAC_ADDR)
+        node_id++;
+        node_id %= NUM_NODES;
+        app_ctrl_obj.tag_mac_addr = node_mac_addr[node_id];
+        ret = app_set_ctrl_params(&app_ctrl_obj);
+        if (ret != APP_SUCCESS)
         {
-            node_id++;
-            node_id %= NUM_NODES;
-            app_ctrl_obj.tag_mac_addr = node_mac_addr[node_id];
-            app_set_ctrl_params(&app_ctrl_obj);
+            continue;
         }
+        
+        #endif
 
         // Run ranging session
-        app_run_ieee_802_15_4z_schedule();
+        ret = app_run_ieee_802_15_4z_schedule();
+        if (ret != APP_SUCCESS)
+        {
+            continue;
+        }
 
         // Read ranging session results
         app_read_log_info(&app_log_info);
@@ -187,8 +180,10 @@ int main (void)
             dist[k] = DWT_TIME_UNITS * LIGHT_SPEED * app_log_info.dist[k];
         }
 
-        // Print log message on console
+        // Log superframe ID on console
         printk("\n\n\n\n\n\nRanging session %llu completed.\n\n", app_log_info.superframe_id);
+
+        // Log distances and MAC addresses of tag and anchor nodes
         for (int k = 0; k < NUM_NODES; k++)
         {
             printk("\tDistance from node 0x%02X to node 0x%02X: %.2f m.\n",

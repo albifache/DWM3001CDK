@@ -11,6 +11,9 @@
 #include <stdint.h>
 
 
+#define MAC_SUCCESS                         0
+#define MAC_ERROR                           -1
+
 #define PAN_COORDINATOR_MAC_ADDR            0x00
 #define BROADCAST_MAC_ADDR                  0xFFFFu
 #define BROADCAST_PAN_ID                    0xFFFFu
@@ -29,10 +32,10 @@ typedef struct
 mac_header_t;
 
 
-void mac_header_write (mac_header_t* mac_header, uint8_t tx_buffer[]);
+int mac_header_write (mac_header_t* mac_header, uint8_t tx_buf[], uint16_t tx_buf_len);
 
 
-void mac_header_read (mac_header_t* mac_header, uint8_t rx_buffer[]);
+int mac_header_read (mac_header_t* mac_header, uint8_t rx_buf[], uint16_t rx_buf_len);
 
 
 #endif

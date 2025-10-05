@@ -180,8 +180,15 @@ int deca_init (void)
 }
 
 
-void deca_read_device_info (deca_hw_info_t *info)
+int deca_read_device_info (deca_hw_info_t *info)
 {
+    // Check if pointer is valid
+    if (info == NULL)
+    {
+        return PORT_RUN_ERROR;
+    }
+
+    // Read DW3000 IC info
     info->device_id = deca_hw_info.device_id;
     info->chip_id = deca_hw_info.chip_id;
     info->lot_id = deca_hw_info.lot_id;
@@ -199,6 +206,8 @@ void deca_read_device_info (deca_hw_info_t *info)
     info->tx_power_ch5_prf64 = deca_hw_info.tx_power_ch5_prf64;
     info->tx_power_ch9_prf16 = deca_hw_info.tx_power_ch9_prf16;
     info->tx_power_ch9_prf64 = deca_hw_info.tx_antd_ch9_prf64;
+
+    return PORT_SUCCESS;
 }
 
 

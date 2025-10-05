@@ -68,38 +68,63 @@ int led_gpio_init (void)
 
 
 // Set or reset LED
-void led_gpio_write (uint8_t led_id, bool state)
+int led_gpio_write (uint8_t led_id, bool state)
 {
+    int ret;
+
     led_state[led_id] = state;
 
     switch (led_id)
     {
         case 0:
-            gpio_pin_set(led_gpio_dev, LED_0_GPIO_PIN, !state);
+            ret = gpio_pin_set(led_gpio_dev, LED_0_GPIO_PIN, !state);
+            if (ret != 0)
+            {
+                return PORT_RUN_ERROR;
+            }
         break;
 
         case 1:
-            gpio_pin_set(led_gpio_dev, LED_1_GPIO_PIN, !state);
+            ret = gpio_pin_set(led_gpio_dev, LED_1_GPIO_PIN, !state);
+            if (ret != 0)
+            {
+                return PORT_RUN_ERROR;
+            }
         break;
 
         case 2:
-            gpio_pin_set(led_gpio_dev, LED_2_GPIO_PIN, !state);
+            ret = gpio_pin_set(led_gpio_dev, LED_2_GPIO_PIN, !state);
+            if (ret != 0)
+            {
+                return PORT_RUN_ERROR;
+            }
         break;
 
         case 3:
-            gpio_pin_set(led_gpio_dev, LED_3_GPIO_PIN, !state);
+            ret = gpio_pin_set(led_gpio_dev, LED_3_GPIO_PIN, !state);
+            if (ret != 0)
+            {
+                return PORT_RUN_ERROR;
+            }
         break;
 
         default:
+            return PORT_RUN_ERROR;
         break;
     }
 
-    return;
+    return PORT_SUCCESS;
 }
 
 
 // Read LED state
-bool led_gpio_read (uint8_t led_id)
+int led_gpio_read (uint8_t led_id)
 {
+    // Check if LED ID is valid
+    if (led_id >= NUM_LEDS)
+    {
+        return PORT_RUN_ERROR;
+    }
+
     return led_state[led_id];
 }

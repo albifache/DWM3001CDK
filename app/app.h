@@ -14,16 +14,10 @@
 
 #define MAX_NUM_ANCHORS                 8
 
-#define MAC_SUCCESS                     0
-#define MAC_HEADER_WARNING              1
-
 #define APP_SUCCESS                     0
-#define APP_RX_ERROR                    -1
-#define APP_SYS_ERROR                   -2
-#define APP_CONFIG_ERROR                -3
-#define APP_RUN_ERROR                   -4
-#define APP_AES_ERROR                   -5
-#define APP_HEADER_WARNING              2
+#define APP_INIT_ERROR                  -1
+#define APP_RUN_ERROR                   -2
+#define APP_RUN_WARNING                 1
 
 
 typedef struct
@@ -66,7 +60,7 @@ int app_set_ctrl_params (app_ctrl_obj_t *obj);
 int app_run_ieee_802_15_4z_schedule (void);
 
 
-void app_read_log_info (app_log_info_t *info);
+int app_read_log_info (app_log_info_t *info);
 
 
 void app_sleep (uint16_t ms);
