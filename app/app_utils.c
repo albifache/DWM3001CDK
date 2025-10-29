@@ -22,7 +22,7 @@ uint64_t app_read_rx_timestamp (void)
 
     dwt_readrxtimestamp_sts(buf);
 
-    for (int k = 0; k < RX_TS_LEN; k++)
+    for (uint8_t k = 0; k < RX_TS_LEN; k++)
     {
         rx_stamp |= ((uint64_t) buf[k]) << (8*k);
     }
@@ -38,7 +38,7 @@ uint64_t app_read_tx_timestamp (void)
 
     dwt_readtxtimestamp(buf);
 
-    for (int k = 0; k < TX_TS_LEN; k++)
+    for (uint8_t k = 0; k < TX_TS_LEN; k++)
     {
         tx_stamp |= ((uint64_t) buf[k]) << (8*k);
     }

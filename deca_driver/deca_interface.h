@@ -478,7 +478,7 @@ struct dwt_spi_s
     * output parameters:
     * returns DWT_SUCCESS for success, or DWT_ERROR for error
     */
-    int32_t (*readfromspi)(uint16_t headerLength, /*const*/ uint8_t *headerBuffer, uint16_t readlength, uint8_t *readBuffer);
+    int16_t (*readfromspi)(uint16_t headerLength, /*const*/ uint8_t *headerBuffer, uint16_t readlength, uint8_t *readBuffer);
 
 /*! ------------------------------------------------------------------------------------------------------------------
     * @brief writetospi
@@ -493,7 +493,7 @@ struct dwt_spi_s
     * output parameters:
     * returns DWT_SUCCESS for success, or DWT_ERROR for error
     */
-    int32_t (*writetospi)(uint16_t headerLength, const uint8_t *headerBuffer, uint16_t bodyLength, const uint8_t *bodyBuffer);
+    int16_t (*writetospi)(uint16_t headerLength, const uint8_t *headerBuffer, uint16_t bodyLength, const uint8_t *bodyBuffer);
 
 /*! ------------------------------------------------------------------------------------------------------------------
     * @brief writetospiwithcrc
@@ -509,7 +509,7 @@ struct dwt_spi_s
     * output parameters:
     * returns DWT_SUCCESS for success, or DWT_ERROR for error
     */
-    int32_t (*writetospiwithcrc)(uint16_t headerLength, const uint8_t *headerBuffer, uint16_t bodyLength, const uint8_t *bodyBuffer, uint8_t crc8);
+    int16_t (*writetospiwithcrc)(uint16_t headerLength, const uint8_t *headerBuffer, uint16_t bodyLength, const uint8_t *bodyBuffer, uint8_t crc8);
 
     /*! ------------------------------------------------------------------------------------------------------------------
      * @brief setslowrate

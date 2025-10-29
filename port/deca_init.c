@@ -48,9 +48,9 @@ static bool deca_init_done = false;
 static deca_hw_info_t deca_hw_info;
 
 
-int deca_init (void)
+int16_t deca_init (void)
 {
-    int ret;
+    int16_t ret;
 
     // Initialize GPIO
     ret = deca_gpio_init();
@@ -97,9 +97,6 @@ int deca_init (void)
     {
         return PORT_INIT_ERROR;
     }
-
-    // Set initialization flag
-    deca_init_done = true;
 
     // Read device ID
     deca_hw_info.device_id = device_id;
@@ -176,14 +173,23 @@ int deca_init (void)
     dwt_otpread(OTP_ADDR_RX_ANT_DELAY_CH9_PRF16, &ant_delay, 1);
     deca_hw_info.rx_antd_ch9_prf16 = (ant_delay >> RX_ANT_DELAY_OFFSET) & RX_ANT_DELAY_MASK;
 
+    // Set initialization flag
+    deca_init_done = true;
+
     return PORT_SUCCESS;
 }
 
 
-int deca_read_device_info (deca_hw_info_t *info)
+int16_t deca_read_device_info (deca_hw_info_t *info)
 {
     // Check if pointer is valid
     if (info == NULL)
+    {
+        return PORT_RUN_ERROR;
+    }
+
+    // Check if device is initialized
+    if (!deca_init_done)
     {
         return PORT_RUN_ERROR;
     }

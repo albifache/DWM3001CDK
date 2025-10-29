@@ -3238,7 +3238,7 @@
      *
      * no return value
      */
-    void deca_sleep(unsigned int time_ms);
+    void deca_sleep(uint16_t time_ms);
 
     /*! ------------------------------------------------------------------------------------------------------------------
      * @brief Wait for a given amount of time.
@@ -3251,7 +3251,7 @@
      *
      * no return value
      */
-    void deca_usleep(unsigned long time_us);
+    void deca_usleep(uint32_t time_us);
 
     /*! ------------------------------------------------------------------------------------------------------------------
      * @brief this reads the device ID and checks if it is the right one

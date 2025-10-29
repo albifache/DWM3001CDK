@@ -19,7 +19,7 @@
 static const struct device *rst_gpio_dev;
 
 
-int deca_gpio_init (void)
+int16_t deca_gpio_init (void)
 {
     rst_gpio_dev = DEVICE_DT_GET(DW_RST_GPIO_DEV_NODE);
     
@@ -45,7 +45,7 @@ void deca_wakeup_device_with_io (void)
 }
 
 
-int deca_reset_ic (void)
+int16_t deca_reset_ic (void)
 {
     // Pull RST pin low
     gpio_pin_set(rst_gpio_dev, DW_RST_GPIO_PIN, false);

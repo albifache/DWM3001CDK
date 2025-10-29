@@ -42,7 +42,7 @@ deca_hw_info_t;
 
 
 // Initialize the DW3000 RST pin 
-int deca_gpio_init (void);
+int16_t deca_gpio_init (void);
 
 
 // Declared just for compatibility, does not have any operational effect
@@ -50,23 +50,23 @@ void deca_wakeup_device_with_io (void);
 
 
 // Initialize SPI for DW3000
-int deca_spi_init (void);
+int16_t deca_spi_init (void);
 
 
 // Reset DW3000 IC
-int deca_reset_ic (void);
+int16_t deca_reset_ic (void);
 
 
 // Transmit over SPI (header, data , CRC) with CRC mode enabled
-int deca_write_to_spi_with_crc (uint16_t headerLength, const uint8_t *headerBuffer, uint16_t bodyLength, const uint8_t *bodyBuffer, uint8_t crc8);
+int16_t deca_write_to_spi_with_crc (uint16_t header_len, const uint8_t header[], uint16_t data_len, const uint8_t data[], uint8_t crc8);
 
 
 // Transmit over SPI (header, data) with CRC mode disabled
-int deca_write_to_spi (uint16_t headerLength, const uint8_t *headerBuffer, uint16_t bodyLength, const uint8_t *bodyBuffer);
+int16_t deca_write_to_spi (uint16_t header_len, const uint8_t header[], uint16_t data_len, const uint8_t data[]);
 
 
 // Trasmit header and receive data over SPI with CRC mode disabled
-int deca_read_from_spi (uint16_t headerLength, uint8_t *headerBuffer, uint16_t readLength, uint8_t *readBuffer);
+int16_t deca_read_from_spi (uint16_t header_len, uint8_t header[], uint16_t data_len, uint8_t data[]);
 
 
 // set SPI data rate to 2 MHz
@@ -86,27 +86,27 @@ void deca_mutex_off (decaIrqStatus_t status);
 
 
 // Sleep for time_ms milliseconds
-void deca_sleep (unsigned int sleep_time_ms);
+void deca_sleep (uint16_t sleep_time_ms);
 
 
 // Sleep for time_us microseconds
-void deca_usleep (unsigned long sleep_time_us);
+void deca_usleep (uint32_t sleep_time_us);
 
 
 // Initialize LEDs
-int led_gpio_init (void);
+int16_t led_gpio_init (void);
 
 
 // Set or reset LED
-int led_gpio_write (uint8_t led_id, bool state);
+int16_t led_gpio_write (uint8_t led_id, bool state);
 
 
 // Read LEDs state
-int led_gpio_read (uint8_t led_id);
+int16_t led_gpio_read (uint8_t led_id);
 
 
 // Initialize DW3000 IC
-int deca_init (void);
+int16_t deca_init (void);
 
 
 // Check if DW3000 IC has been initialized
@@ -114,15 +114,15 @@ bool deca_init_check (void);
 
 
 // Read DW3000 IC hardcoded info
-int deca_read_device_info (deca_hw_info_t *info);
+int16_t deca_read_device_info (deca_hw_info_t *info);
 
 
 // Initialize UART
-int serial_uart_init (void);
+int16_t serial_uart_init (void);
 
 
 // Write to serial port
-int serial_uart_write (uint8_t tx_buf[], uint16_t tx_buf_len);
+int16_t serial_uart_write (uint8_t tx_buf[], uint16_t tx_buf_len);
 
 
 #endif

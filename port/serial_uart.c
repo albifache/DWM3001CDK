@@ -20,9 +20,9 @@ static volatile bool uart_tx_err = false;
 static void serial_uart_cb (const struct device *dev, struct uart_event *evt, void *user_data);
 
 
-int serial_uart_init (void)
+int16_t serial_uart_init (void)
 {
-    int ret;
+    int16_t ret;
 
     uart_dev = DEVICE_DT_GET(UART_DEV_NODE);
 
@@ -74,9 +74,9 @@ static void serial_uart_cb (const struct device *dev, struct uart_event *evt, vo
 }
 
 
-int serial_uart_write (uint8_t tx_buf[], uint16_t tx_buf_len)
+int16_t serial_uart_write (uint8_t tx_buf[], uint16_t tx_buf_len)
 {
-    int ret;
+    int16_t ret;
 
     // Start transmission
     ret = uart_tx(uart_dev, tx_buf, tx_buf_len, SYS_FOREVER_US);

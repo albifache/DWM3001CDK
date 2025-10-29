@@ -23,7 +23,7 @@ static volatile bool led_state[NUM_LEDS];
 
 
 // Initialize LEDs 
-int led_gpio_init (void)
+int16_t led_gpio_init (void)
 {
     // Initialize LEDs
     led_gpio_dev = DEVICE_DT_GET(LED_GPIO_DEV_NODE);
@@ -57,7 +57,7 @@ int led_gpio_init (void)
     }
 
     // Switch off LEDs
-    for (int k = 0; k < NUM_LEDS; k++)
+    for (uint8_t k = 0; k < NUM_LEDS; k++)
     {
         led_state[k] = false;
         led_gpio_write(k, led_state[k]);
@@ -68,9 +68,9 @@ int led_gpio_init (void)
 
 
 // Set or reset LED
-int led_gpio_write (uint8_t led_id, bool state)
+int16_t led_gpio_write (uint8_t led_id, bool state)
 {
-    int ret;
+    int16_t ret;
 
     led_state[led_id] = state;
 
@@ -118,7 +118,7 @@ int led_gpio_write (uint8_t led_id, bool state)
 
 
 // Read LED state
-int led_gpio_read (uint8_t led_id)
+int16_t led_gpio_read (uint8_t led_id)
 {
     // Check if LED ID is valid
     if (led_id >= NUM_LEDS)

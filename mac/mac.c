@@ -8,7 +8,7 @@
 #include "mac.h"
 
 
-int mac_header_write (mac_header_t* mac_header, uint8_t tx_buf[], uint16_t tx_buf_len)
+int16_t mac_header_write (mac_header_t* mac_header, uint8_t tx_buf[], uint16_t tx_buf_len)
 {
     // Validate input
     if (mac_header == NULL ||
@@ -41,7 +41,7 @@ int mac_header_write (mac_header_t* mac_header, uint8_t tx_buf[], uint16_t tx_bu
 }
 
 
-int mac_header_read (mac_header_t* mac_header, uint8_t rx_buf[], uint16_t rx_buf_len)
+int16_t mac_header_read (mac_header_t* mac_header, uint8_t rx_buf[], uint16_t rx_buf_len)
 {
     // Validate input
     if (mac_header == NULL ||

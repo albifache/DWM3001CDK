@@ -20,7 +20,7 @@
 #define PREAMBLE_LEN                            DWT_PLEN_1024               // Preamble length (number of symbols)
 #define STS_LEN                                 DWT_STS_LEN_1024            // STS length (number of symbols)
 
-#define MAC_ADDR                                0x00u                       // MAC address of current node
+#define MAC_ADDR                                0x07u                       // MAC address of current node
 #define PAN_ID                                  0x00u                       // PAN ID of current network
 
 #define STS_KEY_0                               0ul                         // STS key (bits 0-31)
@@ -66,7 +66,7 @@ static float dist[NUM_LEDS];
 
 int main (void)
 {
-    int ret;
+    int16_t ret;
 
     // Initialize LEDs
     ret = led_gpio_init();
@@ -163,7 +163,7 @@ int main (void)
     led_id[3] = GREEN_LED;
 
     // Switch off LEDs as default
-    for (int k = 0; k < NUM_LEDS; k++)
+    for (uint8_t k = 0; k < NUM_LEDS; k++)
     {
         led_gpio_write(led_id[k], false);
     }
@@ -189,13 +189,13 @@ int main (void)
         app_read_log_info(&app_log_info);
         
         // Compute distances (m)
-        for (int k = 0; k < NUM_LEDS; k++)
+        for (uint8_t k = 0; k < NUM_LEDS; k++)
         {
             dist[k] = LIGHT_SPEED * DWT_TIME_UNITS * app_log_info.dist[k];
         }
 
         // Switch on LEDs
-        for (int k = 0; k < NUM_LEDS; k++)
+        for (uint8_t k = 0; k < NUM_LEDS; k++)
         {
             if (dist[k] < ALERT_DIST &&
                 dist[k] > 0 &&
@@ -209,7 +209,7 @@ int main (void)
         app_sleep(BLINK_TIME);
 
         // Switch off LEDs
-        for (int k = 0; k < NUM_LEDS; k++)
+        for (uint8_t k = 0; k < NUM_LEDS; k++)
         {
             if (dist[k] < ALERT_DIST &&
                 dist[k] > 0 &&

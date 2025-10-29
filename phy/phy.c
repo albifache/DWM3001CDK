@@ -21,9 +21,9 @@
 #define DEFAULT_TX_POWER_CH9                    0xFEFEFEFEul
 
 
-int phy_init (phy_init_obj_t *obj)
+int16_t phy_init (phy_init_obj_t *obj)
 {
-    int ret;
+    int16_t ret;
 
     // Check if pointer is valid
     if (obj == NULL)

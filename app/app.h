@@ -51,16 +51,16 @@ typedef struct
 app_log_info_t;
 
 
-int app_init (app_init_obj_t *obj);
+int16_t app_init (app_init_obj_t *obj);
 
 
-int app_set_ctrl_params (app_ctrl_obj_t *obj);
+int16_t app_set_ctrl_params (app_ctrl_obj_t *obj);
 
 
-int app_run_ieee_802_15_4z_schedule (void);
+int16_t app_run_ieee_802_15_4z_schedule (void);
 
 
-int app_read_log_info (app_log_info_t *info);
+int16_t app_read_log_info (app_log_info_t *info);
 
 
 void app_sleep (uint16_t ms);

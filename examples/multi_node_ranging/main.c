@@ -64,7 +64,7 @@ static float dist[MAX_NUM_ANCHORS];
 
 int main (void)
 {
-    int ret;
+    int16_t ret;
     
     // Initialize DW3000 IC
     ret = deca_init();
@@ -131,7 +131,7 @@ int main (void)
     node_mac_addr[5] = NODE_MAC_ADDR_5;
     node_mac_addr[6] = NODE_MAC_ADDR_6;
     node_mac_addr[7] = NODE_MAC_ADDR_7;
-    for (int k = 0; k < NUM_NODES; k++)
+    for (uint16_t k = 0; k < NUM_NODES; k++)
     {
         app_ctrl_obj.anchor_mac_addr[k] = node_mac_addr[k];
     }
@@ -175,7 +175,7 @@ int main (void)
         app_read_log_info(&app_log_info);
         
         // Compute distances (m)
-        for (int k = 0; k < NUM_NODES; k++)
+        for (uint16_t k = 0; k < NUM_NODES; k++)
         {
             dist[k] = DWT_TIME_UNITS * LIGHT_SPEED * app_log_info.dist[k];
         }
@@ -184,7 +184,7 @@ int main (void)
         printk("\n\n\n\n\n\nRanging session %llu completed.\n\n", app_log_info.superframe_id);
 
         // Log distances and MAC addresses of tag and anchor nodes
-        for (int k = 0; k < NUM_NODES; k++)
+        for (uint16_t k = 0; k < NUM_NODES; k++)
         {
             printk("\tDistance from node 0x%02X to node 0x%02X: %.2f m.\n",
                     node_mac_addr[node_id],

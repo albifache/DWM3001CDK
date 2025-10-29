@@ -2704,7 +2704,10 @@ static int32_t ull_readstsquality(dwchip_t *dw, int16_t *rxStsQualityIndex)
         preambleCount |= STS_ACC_CP_QUAL_SIGNEXT;
     }
 
-    *rxStsQualityIndex = (int16_t)preambleCount;
+    if (rxStsQualityIndex != NULL)
+    {
+        *rxStsQualityIndex = (int16_t)preambleCount;
+    }
 
     // determine if the STS Rx quality is good or bad (return >=0 for good and < 0 if bad)
     return ((int32_t)preambleCount - (int32_t)LOCAL_DATA(dw)->ststhreshold);
@@ -2728,6 +2731,7 @@ static int32_t ull_readstsstatus(dwchip_t *dw, uint16_t *stsStatus, int32_t sts_
     dwt_error_e ret = DWT_SUCCESS;
     uint32_t stsStatusRegAdd = (sts_num == 1) ? BUF0_STS1_STAT : BUF0_STS_STAT;
     uint32_t stsStatusRegAddN = (sts_num == 1) ? STS1_TOA_HI_ID : STS_TOA_HI_ID;
+    uint16_t status = 0;
 
     switch ((dwt_dbl_buff_conf_e)LOCAL_DATA(dw)->dblbuffon)
     // check if in double buffer mode and if so which buffer host is currently accessing
@@ -2735,20 +2739,26 @@ static int32_t ull_readstsstatus(dwchip_t *dw, uint16_t *stsStatus, int32_t sts_
     case DBL_BUFF_ACCESS_BUFFER_1:
         //!!! Assumes that Indirect pointer register B was already set. This is done in the dwt_setdblrxbuffmode when mode is enabled.
         reg_offset = (stsStatusRegAdd - BUF0_RX_FINFO + 2UL) >> 7UL;
-        *stsStatus = dwt_read16bitoffsetreg(dw, INDIRECT_POINTER_B_ID, (uint16_t)reg_offset);
+        status = dwt_read16bitoffsetreg(dw, INDIRECT_POINTER_B_ID, (uint16_t)reg_offset);
         break;
     case DBL_BUFF_ACCESS_BUFFER_0:
-        *stsStatus = (dwt_read16bitoffsetreg(dw, stsStatusRegAdd, 2U) >> 7U);
+        status = (dwt_read16bitoffsetreg(dw, stsStatusRegAdd, 2U) >> 7U);
         break;
     default:
-        *stsStatus = (dwt_read16bitoffsetreg(dw, stsStatusRegAddN, 2U) >> 7U);
+        status = (dwt_read16bitoffsetreg(dw, stsStatusRegAddN, 2U) >> 7U);
         break;
     }
 
     // determine if the STS is ok
-    if (*stsStatus != 0U /*& DWT_SFD_COUNT_WARN*/)
+    if (status != 0U /*& DWT_SFD_COUNT_WARN*/)
     {
         ret = DWT_ERROR;
+    }
+
+    // save STS status
+    if (stsStatus != NULL)
+    {
+        *stsStatus = status;
     }
 
     return (int32_t)ret;

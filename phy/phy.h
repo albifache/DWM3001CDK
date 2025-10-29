@@ -27,7 +27,7 @@ typedef struct
 phy_init_obj_t;
 
 
-int phy_init (phy_init_obj_t *obj);
+int16_t phy_init (phy_init_obj_t *obj);
 
 
 #endif

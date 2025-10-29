@@ -10,7 +10,7 @@
 
 
 extern const struct dwt_driver_s dw3000_driver;
-const struct dwt_driver_s* tmp_ptr[] = {&dw3000_driver};
+const struct dwt_driver_s* drv_list_ptr[] = {&dw3000_driver};
 
 static const struct dwt_spi_s dw3000_spi_fct =
 {
@@ -26,6 +26,6 @@ const struct dwt_probe_s dw3000_probe_interf =
     .dw = NULL,
     .spi = (void*)&dw3000_spi_fct,
     .wakeup_device_with_io = deca_wakeup_device_with_io,
-    .driver_list = (struct dwt_driver_s **)tmp_ptr,
+    .driver_list = (struct dwt_driver_s **)drv_list_ptr,
     .dw_driver_num = 1,
 };

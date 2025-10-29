@@ -139,26 +139,26 @@ static uint64_t dist[MAX_NUM_ANCHORS];
 
 
 // Private functions
-static int app_header_write (app_header_t* app_header, uint8_t tx_buf[], uint16_t tx_buf_len);
-static int app_header_read (app_header_t* app_header, uint8_t rx_buf[], uint16_t rx_buf_len);
-static int app_wait_tx_done (void);
-static int app_wait_rx_done (void);
-static int app_aes_encrypt (uint8_t tx_buffer[], uint16_t tx_frame_len);
-static int app_aes_decrypt (uint8_t rx_buffer[], uint16_t rx_frame_len);
+static int16_t app_header_write (app_header_t* app_header, uint8_t tx_buf[], uint16_t tx_buf_len);
+static int16_t app_header_read (app_header_t* app_header, uint8_t rx_buf[], uint16_t rx_buf_len);
+static int16_t app_wait_tx_done (void);
+static int16_t app_wait_rx_done (void);
+static int16_t app_aes_encrypt (uint8_t tx_buffer[], uint16_t tx_frame_len);
+static int16_t app_aes_decrypt (uint8_t rx_buffer[], uint16_t rx_frame_len);
 static void app_sts_generate (void);
-static int app_send_init_msg (void);
-static int app_wait_init_msg (void);
-static int app_send_rqst_msg (void);
-static int app_wait_rqst_msg (void);
-static int app_send_resp_msg (void);
-static int app_wait_resp_msg (void);
-static int app_send_report_msg (void);
-static int app_wait_report_msg (void);
-static int app_send_final_msg (void);
-static int app_wait_final_msg (void);
+static int16_t app_send_init_msg (void);
+static int16_t app_wait_init_msg (void);
+static int16_t app_send_rqst_msg (void);
+static int16_t app_wait_rqst_msg (void);
+static int16_t app_send_resp_msg (void);
+static int16_t app_wait_resp_msg (void);
+static int16_t app_send_report_msg (void);
+static int16_t app_wait_report_msg (void);
+static int16_t app_send_final_msg (void);
+static int16_t app_wait_final_msg (void);
 
 
-static int app_header_write (app_header_t* app_header, uint8_t tx_buf[], uint16_t tx_buf_len)
+static int16_t app_header_write (app_header_t* app_header, uint8_t tx_buf[], uint16_t tx_buf_len)
 {
     // Validate input
     if (app_header == NULL ||
@@ -193,7 +193,7 @@ static int app_header_write (app_header_t* app_header, uint8_t tx_buf[], uint16_
 }
 
 
-static int app_header_read (app_header_t* app_header, uint8_t rx_buf[], uint16_t rx_buf_len)
+static int16_t app_header_read (app_header_t* app_header, uint8_t rx_buf[], uint16_t rx_buf_len)
 {
     // Validate input
     if (app_header == NULL ||
@@ -228,7 +228,7 @@ static int app_header_read (app_header_t* app_header, uint8_t rx_buf[], uint16_t
 }
 
 
-static int app_aes_encrypt (uint8_t tx_buffer[], uint16_t tx_frame_len)
+static int16_t app_aes_encrypt (uint8_t tx_buffer[], uint16_t tx_frame_len)
 {
     // Configure AES engine
     dwt_aes_config_t aes_config;
@@ -244,9 +244,9 @@ static int app_aes_encrypt (uint8_t tx_buffer[], uint16_t tx_frame_len)
 
     // Generate nonce
     uint8_t nonce[12];
-    nonce[0] = slot_id;
+    nonce[0] = 0;
     nonce[1] = 0;
-    nonce[2] = 0;
+    nonce[2] = slot_id;
     nonce[3] = 0;
     nonce[4] = superframe_id & 0xFF;
     nonce[5] = (superframe_id >> 8) & 0xFF;
@@ -280,7 +280,7 @@ static int app_aes_encrypt (uint8_t tx_buffer[], uint16_t tx_frame_len)
 }
 
 
-static int app_aes_decrypt (uint8_t rx_buffer[], uint16_t rx_frame_len)
+static int16_t app_aes_decrypt (uint8_t rx_buffer[], uint16_t rx_frame_len)
 {
     // Configure AES engine
     dwt_aes_config_t aes_config;
@@ -296,9 +296,9 @@ static int app_aes_decrypt (uint8_t rx_buffer[], uint16_t rx_frame_len)
 
     // Generate nonce
     uint8_t nonce[12];
-    nonce[0] = slot_id;
+    nonce[0] = 0;
     nonce[1] = 0;
-    nonce[2] = 0;
+    nonce[2] = slot_id;
     nonce[3] = 0;
     nonce[4] = superframe_id & 0xFF;
     nonce[5] = (superframe_id >> 8) & 0xFF;
@@ -348,10 +348,10 @@ static void app_sts_generate (void)
     // Set unique STS init vector otherwise
     else
     {
-        sts_iv.iv0 = slot_id;
-        sts_iv.iv1 = superframe_id;
-        sts_iv.iv2 = superframe_id >> 32;
-        sts_iv.iv3 = 0;
+        sts_iv.iv0 = 0;
+        sts_iv.iv1 = slot_id;
+        sts_iv.iv2 = superframe_id;
+        sts_iv.iv3 = superframe_id >> 32;
     }
 
     // Write STS init vector
@@ -360,7 +360,7 @@ static void app_sts_generate (void)
 }
 
 
-static int app_wait_tx_done (void)
+static int16_t app_wait_tx_done (void)
 {
     volatile uint32_t sys_status_lo;
     volatile uint32_t sys_status_hi;
@@ -392,15 +392,12 @@ static int app_wait_tx_done (void)
 }
 
 
-static int app_wait_rx_done (void)
+static int16_t app_wait_rx_done (void)
 {
     volatile uint32_t sys_status_lo;
     volatile uint32_t sys_status_hi;
-
     volatile int32_t sts_qual;
     volatile int32_t sts_status;
-    int16_t sts_qual_idx;
-    uint16_t sts_status_val;
 
     while (1)
     {
@@ -413,18 +410,16 @@ static int app_wait_rx_done (void)
             dwt_writesysstatuslo(SYS_STATUS_RXFCG_BIT_MASK | SYS_STATUS_CIADONE_BIT_MASK);
 
             // Read STS quality and status
-            sts_qual = dwt_readstsquality(&sts_qual_idx, 0);
-            sts_status = dwt_readstsstatus(&sts_status_val, 0);
+            sts_qual = dwt_readstsquality(NULL, 0);
+            sts_status = dwt_readstsstatus(NULL, 0);
 
             // Check if STS quality is good enough
             if (sts_qual < 0 || sts_status < 0)
             {
                 return APP_RUN_ERROR;
             }
-            else
-            {
-                return APP_SUCCESS;
-            }
+
+            return APP_SUCCESS;
         }
 
         // Check if PHY errors occurred or timeouts expired during reception
@@ -451,9 +446,9 @@ static int app_wait_rx_done (void)
 }
 
 
-static int app_send_init_msg (void)
+static int16_t app_send_init_msg (void)
 {
-    int ret;
+    int16_t ret;
 
     // Set TX frame length
     uint16_t tx_frame_len = HEADER_LEN + 3 + 2 * num_anchors + MIC_LEN + FCS_LEN;
@@ -498,14 +493,14 @@ static int app_send_init_msg (void)
     tx_buffer[HEADER_LEN + 2] = (tag_mac_addr >> 8) & 0xFF;
 
     // Write anchors MAC adresses
-    for (int k = 0; k < num_anchors; k++)
+    for (uint8_t k = 0; k < num_anchors; k++)
     {
         tx_buffer[HEADER_LEN + 3 + 2 * k] = anchor_mac_addr[k] & 0xFF;
         tx_buffer[HEADER_LEN + 4 + 2 * k] = (anchor_mac_addr[k] >> 8) & 0xFF;
     }
 
     // Check if this node is an anchor
-    for (int k = 0; k < num_anchors; k++)
+    for (uint8_t k = 0; k < num_anchors; k++)
     {
         if (anchor_mac_addr[k] == mac_addr)
         {
@@ -555,9 +550,9 @@ static int app_send_init_msg (void)
 }
 
 
-static int app_wait_init_msg (void)
+static int16_t app_wait_init_msg (void)
 {
-    int ret;
+    int16_t ret;
 
     // Disable RX timeout
     app_set_rx_timeout(RX_TIMEOUT_DISABLED);
@@ -644,7 +639,7 @@ static int app_wait_init_msg (void)
     tag_mac_addr |= ((uint16_t) rx_buffer[HEADER_LEN + 2]) << 8;
     
     // Read anchors MAC addresses
-    for (int k = 0; k < num_anchors; k++)
+    for (uint8_t k = 0; k < num_anchors; k++)
     {
         anchor_mac_addr[k] = (uint16_t) rx_buffer[HEADER_LEN + 3 + 2 * k];
         anchor_mac_addr[k] |= ((uint16_t) rx_buffer[HEADER_LEN + 4 + 2 * k]) << 8;
@@ -659,7 +654,7 @@ static int app_wait_init_msg (void)
     }
 
     // Check if the node has been selected as anchor
-    for (int k = 0; k < num_anchors; k++)
+    for (uint8_t k = 0; k < num_anchors; k++)
     {
         if (anchor_mac_addr[k] == mac_addr)
         {
@@ -677,9 +672,9 @@ static int app_wait_init_msg (void)
 }
  
 
-static int app_send_rqst_msg (void)
+static int16_t app_send_rqst_msg (void)
 {
-    int ret;
+    int16_t ret;
 
     // Set TX frame length
     uint16_t tx_frame_len = HEADER_LEN + MIC_LEN + FCS_LEN;
@@ -749,9 +744,9 @@ static int app_send_rqst_msg (void)
 }
 
 
-static int app_wait_rqst_msg (void)
+static int16_t app_wait_rqst_msg (void)
 {
-    int ret;
+    int16_t ret;
 
     // Enable RX timeout
     app_set_rx_timeout(DEFAULT_RX_TIMEOUT);
@@ -824,13 +819,20 @@ static int app_wait_rqst_msg (void)
         return APP_RUN_WARNING;
     }
 
+    // Decrypt payload
+    ret = app_aes_decrypt(rx_buffer, rx_frame_len);
+    if (ret != APP_SUCCESS)
+    {
+        return APP_RUN_ERROR;
+    }
+
     return APP_SUCCESS;
 }
 
       
-static int app_send_resp_msg (void)
+static int16_t app_send_resp_msg (void)
 {
-    int ret;
+    int16_t ret;
 
     // Set TX frame length
     uint16_t tx_frame_len = HEADER_LEN + MIC_LEN + FCS_LEN;
@@ -863,6 +865,7 @@ static int app_send_resp_msg (void)
     {
         return APP_RUN_ERROR;
     }
+
     // Set TX timestamp of RESPONSE message
     ts_tx_resp = (ts_rx_init + slot_id * SLOT_TIME) & CLOCK_COARSE_MASK;
     app_set_delayed_trx_time(ts_tx_resp);
@@ -899,9 +902,9 @@ static int app_send_resp_msg (void)
 }
 
 
-static int app_wait_resp_msg (void)
+static int16_t app_wait_resp_msg (void)
 {
-    int ret;
+    int16_t ret;
 
     // Enable RX timeout
     app_set_rx_timeout(DEFAULT_RX_TIMEOUT);
@@ -977,13 +980,20 @@ static int app_wait_resp_msg (void)
         return APP_RUN_WARNING;
     }
 
+    // Decrypt payload
+    ret = app_aes_decrypt(rx_buffer, rx_frame_len);
+    if (ret != APP_SUCCESS)
+    {
+        return APP_RUN_ERROR;
+    }
+
     return APP_SUCCESS;
 }
 
 
-static int app_send_report_msg (void)
+static int16_t app_send_report_msg (void)
 {
-    int ret;
+    int16_t ret;
 
     // Set TX frame length
     uint16_t tx_frame_len = HEADER_LEN + 8 + 4 * num_anchors + MIC_LEN + FCS_LEN;
@@ -1024,7 +1034,7 @@ static int app_send_report_msg (void)
     tx_buffer[HEADER_LEN + 3] = (ts_tx_rqst >> 24) & 0xFF;
     
     // Write RX timestamp of RESPONSE messages
-    for (int k = 0; k < num_anchors; k++)
+    for (uint8_t k = 0; k < num_anchors; k++)
     {
         tx_buffer[HEADER_LEN + 4 + 4 * k] = ts_rx_resp[k] & 0xFF;
         tx_buffer[HEADER_LEN + 5 + 4 * k] = (ts_rx_resp[k] >> 8) & 0xFF;
@@ -1076,9 +1086,9 @@ static int app_send_report_msg (void)
 }
 
 
-static int app_wait_report_msg (void)
+static int16_t app_wait_report_msg (void)
 {
-    int ret;
+    int16_t ret;
 
     // Enable RX timeout
     app_set_rx_timeout(DEFAULT_RX_TIMEOUT);
@@ -1190,9 +1200,9 @@ static int app_wait_report_msg (void)
 }
 
 
-static int app_send_final_msg (void)
+static int16_t app_send_final_msg (void)
 {
-    int ret;
+    int16_t ret;
 
     // Set TX frame length
     uint16_t tx_frame_len = HEADER_LEN + 4 + MIC_LEN + FCS_LEN;
@@ -1267,9 +1277,9 @@ static int app_send_final_msg (void)
 }
 
 
-static int app_wait_final_msg (void)
+static int16_t app_wait_final_msg (void)
 {
-    int ret;
+    int16_t ret;
 
     // Enable RX timeout
     app_set_rx_timeout(DEFAULT_RX_TIMEOUT);
@@ -1359,9 +1369,9 @@ static int app_wait_final_msg (void)
 }
 
 
-int app_run_ieee_802_15_4z_schedule (void)
+int16_t app_run_ieee_802_15_4z_schedule (void)
 {
-    int ret = 0;
+    int16_t ret = 0;
 
     // Reset scheduler state and slot ID
     app_state = APP_STATE_BEGIN;
@@ -1372,7 +1382,7 @@ int app_run_ieee_802_15_4z_schedule (void)
     ts_tx_rqst = 0ull;
     ts_rx_rqst = 0ull;
     ts_tx_resp = 0ull;
-    for (int k = 0; k < MAX_NUM_ANCHORS; k++)
+    for (uint8_t k = 0; k < MAX_NUM_ANCHORS; k++)
     {
         ts_rx_resp[k] = 0ull;
     }
@@ -1381,7 +1391,7 @@ int app_run_ieee_802_15_4z_schedule (void)
     ts_tx_final = 0ull;
 
     // Zeroing all distances
-    for (int k = 0; k < MAX_NUM_ANCHORS; k++)
+    for (uint8_t k = 0; k < MAX_NUM_ANCHORS; k++)
     {
         dist[k] = 0ull;
     }
@@ -1663,7 +1673,7 @@ int app_run_ieee_802_15_4z_schedule (void)
 }
 
 
-int app_init (app_init_obj_t *obj)
+int16_t app_init (app_init_obj_t *obj)
 {
     // Check if pointer is valid
     if (obj == NULL)
@@ -1705,7 +1715,7 @@ int app_init (app_init_obj_t *obj)
 }
 
 
-int app_set_ctrl_params (app_ctrl_obj_t *obj)
+int16_t app_set_ctrl_params (app_ctrl_obj_t *obj)
 {
     // Check if pointer is valid
     if (obj == NULL)
@@ -1726,7 +1736,7 @@ int app_set_ctrl_params (app_ctrl_obj_t *obj)
     }
 
     // Check if the MAC addresses of all the anchors are valid
-    for (int k = 0; k < obj->num_anchors; k++)
+    for (uint8_t k = 0; k < obj->num_anchors; k++)
     {
         if (obj->anchor_mac_addr[k] == BROADCAST_MAC_ADDR)
         {
@@ -1741,7 +1751,7 @@ int app_set_ctrl_params (app_ctrl_obj_t *obj)
     num_anchors = obj->num_anchors;
 
     // Set anchors MAC addresses
-    for (int k = 0; k < num_anchors; k++)
+    for (uint8_t k = 0; k < num_anchors; k++)
     {
         anchor_mac_addr[k] = obj->anchor_mac_addr[k];
     }
@@ -1750,7 +1760,7 @@ int app_set_ctrl_params (app_ctrl_obj_t *obj)
 }
 
 
-int app_read_log_info (app_log_info_t *info)
+int16_t app_read_log_info (app_log_info_t *info)
 {
     // Check if pointer is valid
     if (info == NULL)
@@ -1765,7 +1775,7 @@ int app_read_log_info (app_log_info_t *info)
     info->ts_init = ts_rx_init;
 
     // Write distances
-    for (int k = 0; k < MAX_NUM_ANCHORS; k++)
+    for (uint8_t k = 0; k < MAX_NUM_ANCHORS; k++)
     {
         info->dist[k] = dist[k];
     }
@@ -1777,7 +1787,7 @@ int app_read_log_info (app_log_info_t *info)
     info->tag_mac_addr = tag_mac_addr;
 
     // Write anchors MAC addresses
-    for (int k = 0; k < MAX_NUM_ANCHORS; k++)
+    for (uint8_t k = 0; k < MAX_NUM_ANCHORS; k++)
     {
         info->anchor_mac_addr[k] = anchor_mac_addr[k];
     }
