@@ -5,8 +5,6 @@
  *            if driver require different implementation, it can override it with a
  *            static fn() in the dwXXXX_device.c
  *
- * @author    Decawave Applications
- *
  * @copyright SPDX-FileCopyrightText: Copyright (c) 2024 Qorvo US, Inc.
  *            SPDX-License-Identifier: LicenseRef-QORVO-2
  *
@@ -137,16 +135,6 @@ int32_t interface_tx_frame(struct dwchip_s *dw, uint8_t *data, size_t len, struc
 
         struct dwt_tx_fctrl_s txfctrl = { (uint16_t)len, 0U, (((info->flag & MCPS_RANGING_BIT) != 0U) ? 1U : 0U) };
         (void)ops->ioctl(dw, DWT_WRITETXFCTRL, 0, (void *)&txfctrl); // Ranging bit shall not be set for non-ranging frames
-    }
-
-    struct dwt_enable_auto_ack_s ack = {
-        .responseDelayTime = 0U, // local->ack_time,
-        .enable = 0             /*local->ack_time << DW3000_ACK_RESP_ACK_TIM_BIT_OFFSET | info->rx_delay_dly; */
-    };
-
-    if (ack.enable != 0)
-    {
-        (void)ops->ioctl(dw, DWT_ENABLEAUTOACK, 0, (void *)&ack);
     }
 
     // Setup for delayed Transmit time (units are 4ns)

@@ -84,6 +84,12 @@ Edit the main configuration in `main.c`. Parameters can be modified but must be 
 #define BLUE_LED                                3                           // LED that blinks when tag is too close to anchor 3
 
 #define ALERT_DIST                              1.0f                        // Alert distance (m)
+
+#define GUARD_TIME                              1                           // Guard time (ms)
+#define SLEEP_TIME                              500                         // Sleeping time (ms)
+#define BLINK_TIME                              500                         // LED blinking time (ms)
+
+#define LIGHT_SPEED                             2.99702547e8f               // Speed of light (m/s)
 ```
 
 ## Debugging

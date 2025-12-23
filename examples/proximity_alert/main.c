@@ -11,6 +11,8 @@
 #include "../../phy/phy.h"
 #include "../../port/port.h"
 #include <stdio.h>
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
 #include <zephyr/sys/printk.h>
 
 
@@ -20,7 +22,7 @@
 #define PREAMBLE_LEN                            DWT_PLEN_1024               // Preamble length (number of symbols)
 #define STS_LEN                                 DWT_STS_LEN_1024            // STS length (number of symbols)
 
-#define MAC_ADDR                                0x07u                       // MAC address of current node
+#define MAC_ADDR                                0x00u                       // MAC address of current node
 #define PAN_ID                                  0x00u                       // PAN ID of current network
 
 #define STS_KEY_0                               0ul                         // STS key (bits 0-31)
@@ -47,9 +49,9 @@
 
 #define ALERT_DIST                              1.0f                        // Alert distance (m)
 
-#define GUARD_TIME                              10                          // Guard time (ms)
-#define SLEEP_TIME                              100                         // Sleeping time (ms)
-#define BLINK_TIME                              100                         // LED blinking time (ms)
+#define GUARD_TIME                              1                           // Guard time (ms)
+#define SLEEP_TIME                              500                         // Sleeping time (ms)
+#define BLINK_TIME                              500                         // LED blinking time (ms)
 
 #define LIGHT_SPEED                             2.99702547e8f               // Speed of light (m/s)
 
@@ -171,12 +173,11 @@ int main (void)
     // Begin loop
     while (1)
     {
-        #if (MAC_ADDR == PAN_COORDINATOR_MAC_ADDR)
-        
         // Wait a bit before proceeding to make sure all the anchors have receiver switched on
-        app_sleep(GUARD_TIME);
-
-        #endif
+        if (MAC_ADDR == PAN_COORDINATOR_MAC_ADDR)
+        {
+            k_msleep(GUARD_TIME);
+        }
         
         // Run ranging session
         ret = app_run_ieee_802_15_4z_schedule();
@@ -185,13 +186,16 @@ int main (void)
             continue;
         }
 
+        // Begin deep sleep mode (low-power state)
+        deca_begin_deepsleep();
+
         // Read ranging session logs
         app_read_log_info(&app_log_info);
         
         // Compute distances (m)
         for (uint8_t k = 0; k < NUM_LEDS; k++)
         {
-            dist[k] = LIGHT_SPEED * DWT_TIME_UNITS * app_log_info.dist[k];
+            dist[k] = LIGHT_SPEED * (float) DWT_TIME_UNITS * app_log_info.dist[k];
         }
 
         // Switch on LEDs
@@ -206,7 +210,7 @@ int main (void)
         }
         
         // Sleep while LEDs are ON
-        app_sleep(BLINK_TIME);
+        k_msleep(BLINK_TIME);
 
         // Switch off LEDs
         for (uint8_t k = 0; k < NUM_LEDS; k++)
@@ -220,6 +224,9 @@ int main (void)
         }
         
         // Sleep while LEDs are OFF
-        app_sleep(SLEEP_TIME);
+        k_msleep(SLEEP_TIME);
+
+        // Wake up DW3000 IC
+        deca_wake_up();
     }
 }

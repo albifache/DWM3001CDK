@@ -4,16 +4,19 @@
  */
 
 
+#include "port.h"
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/spi.h>
-#include "port.h"
 
 
 #define DW_SPI_DEV_NODE             DT_NODELABEL(spi3)
 #define DW_CS_GPIO_DEV_NODE         DT_NODELABEL(gpio1)
 #define DW_CS_GPIO_PIN              6
+
+#define WAKEUP_TIME                 200
+#define STARTUP_TIME                2000
 
 
 static const struct device *spi_dev;
@@ -78,7 +81,7 @@ void deca_set_spi_fast_rate (void)
 }
 
 
-int16_t deca_write_to_spi_with_crc (uint16_t header_len, const uint8_t header[], uint16_t data_len, const uint8_t data[], uint8_t crc8)
+int32_t deca_write_to_spi_with_crc (uint16_t header_len, const uint8_t header[], uint16_t data_len, const uint8_t data[], uint8_t crc8)
 {
     struct spi_buf tx_bufs[3];
     struct spi_buf_set tx_buf_set;
@@ -109,7 +112,7 @@ int16_t deca_write_to_spi_with_crc (uint16_t header_len, const uint8_t header[],
 }
 
 
-int16_t deca_write_to_spi (uint16_t header_len, const uint8_t header[], uint16_t data_len, const uint8_t data[])
+int32_t deca_write_to_spi (uint16_t header_len, const uint8_t header[], uint16_t data_len, const uint8_t data[])
 {
     struct spi_buf tx_bufs[2];
     struct spi_buf_set tx_buf_set;
@@ -136,7 +139,7 @@ int16_t deca_write_to_spi (uint16_t header_len, const uint8_t header[], uint16_t
 }
 
 
-int16_t deca_read_from_spi (uint16_t header_len, uint8_t header[], uint16_t data_len, uint8_t data[])
+int32_t deca_read_from_spi (uint16_t header_len, uint8_t header[], uint16_t data_len, uint8_t data[])
 {
     struct spi_buf tx_bufs[1];
     struct spi_buf_set tx_buf_set;
@@ -168,4 +171,15 @@ int16_t deca_read_from_spi (uint16_t header_len, uint8_t header[], uint16_t data
     gpio_pin_set(cs_gpio_dev, DW_CS_GPIO_PIN, true);
 
     return PORT_SUCCESS;
+}
+
+
+void deca_wakeup_device_with_io (void)
+{
+    gpio_pin_set(cs_gpio_dev, DW_CS_GPIO_PIN, false);
+    k_usleep(WAKEUP_TIME);
+    gpio_pin_set(cs_gpio_dev, DW_CS_GPIO_PIN, true);
+    k_usleep(STARTUP_TIME);
+
+    return;
 }

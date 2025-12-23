@@ -58,4 +58,6 @@ void app_set_delayed_trx_time (uint64_t start_time)
 void app_set_rx_timeout (uint64_t rx_timeout)
 {
     dwt_setrxtimeout(rx_timeout >> RX_TIMEOUT_OFFSET);
+
+    return;
 }

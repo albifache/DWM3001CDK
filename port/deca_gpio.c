@@ -4,16 +4,17 @@
  */
 
 
+#include "port.h"
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
-#include "port.h"
 
 
 #define DW_RST_GPIO_DEV_NODE        DT_NODELABEL(gpio0)
 #define DW_RST_GPIO_PIN             25
 
-#define RESET_TIME                  5
+#define RESET_TIME                  2000
+#define STARTUP_TIME                2000
 
 
 static const struct device *rst_gpio_dev;
@@ -39,21 +40,15 @@ int16_t deca_gpio_init (void)
 }
 
 
-void deca_wakeup_device_with_io (void)
-{
-    return;
-}
-
-
 int16_t deca_reset_ic (void)
 {
     // Pull RST pin low
     gpio_pin_set(rst_gpio_dev, DW_RST_GPIO_PIN, false);
-    k_msleep(RESET_TIME);
+    k_usleep(RESET_TIME);
     
-    // Relrease RST pin
+    // Release RST pin
     gpio_pin_set(rst_gpio_dev, DW_RST_GPIO_PIN, true);
-    k_msleep(RESET_TIME);
+    k_usleep(STARTUP_TIME);
 
     return PORT_SUCCESS;
 }

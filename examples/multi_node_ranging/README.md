@@ -12,7 +12,7 @@ This project is intended for educational and research purposes. For production d
 
 ## Overview
 
-This example implements a RTLS where each node periodically ranges all the other nodes following a round-robin scheme. For this example you will need 2 to 9 DWM3001CDK modules. The code might contain some small inefficiencies since it is designed to be as readable and educational as possible.
+This example implements a RTLS where each node periodically ranges all the other nodes following a round-robin scheme. For this example you will need at least 2 DWM3001CDK modules. The code might contain some small inefficiencies since it is designed to be as readable and educational as possible.
 
 ## Building and Flashing
 
@@ -71,7 +71,7 @@ Edit the main configuration in `main.c`. Parameters can be modified but must be 
 #define AES_KEY_2                               0ul                         // AES key (bits 64-95)
 #define AES_KEY_3                               0ul                         // AES key (bits 96-127)
 
-#define NUM_NODES                               6                           // Number of nodes (max 8)
+#define NUM_NODES                               8                           // Number of nodes (max 8)
 
 #define NODE_MAC_ADDR_0                         0x00                        // MAC address of node 0
 #define NODE_MAC_ADDR_1                         0x01                        // MAC address of node 1
@@ -79,8 +79,13 @@ Edit the main configuration in `main.c`. Parameters can be modified but must be 
 #define NODE_MAC_ADDR_3                         0x06                        // MAC address of node 3
 #define NODE_MAC_ADDR_4                         0x07                        // MAC address of node 4
 #define NODE_MAC_ADDR_5                         0x09                        // MAC address of node 5
-#define NODE_MAC_ADDR_6                         0                           // MAC address of node 6 (unused in this case)
-#define NODE_MAC_ADDR_7                         0                           // MAC address of node 7 (unused in this case)
+#define NODE_MAC_ADDR_6                         0x0A                        // MAC address of node 6
+#define NODE_MAC_ADDR_7                         0x0F                        // MAC address of node 7
+
+#define GUARD_TIME                              1                           // Guard time (ms)
+#define SLEEP_TIME                              1000                        // Sleeping time (ms)
+
+#define LIGHT_SPEED                             2.99702547e8f               // Speed of light (m/s)
 ```
 
 ## Debugging

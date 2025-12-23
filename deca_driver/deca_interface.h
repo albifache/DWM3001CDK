@@ -3,8 +3,6 @@
  *
  * @brief     Interface to the Decawave driver
  *
- * @author    Decawave Applications
- *
  * @copyright SPDX-FileCopyrightText: Copyright (c) 2024 Qorvo US, Inc.
  *            SPDX-License-Identifier: LicenseRef-QORVO-2
  *
@@ -24,6 +22,8 @@ typedef enum
     DWT_STARTTX,
     DWT_SETDELAYEDTRXTIME,
     DWT_CONFIGURESFDTYPE,
+    DWT_SETTXCODE,
+    DWT_SETRXCODE,
     DWT_CONFIGURELEADDRESS,
     DWT_SETKEYREG128,
     DWT_ENABLEGPIOCLOCKS,
@@ -43,6 +43,8 @@ typedef enum
     DWT_CONFIGURESTSLOADIV,
     DWT_CONFIGMRXLUT,
     DWT_RESTORECONFIG,
+    DWT_RESTORECOMMON,
+    DWT_RESTORETXRX,
     DWT_CONFIGURESTSMODE,
     DWT_SETRXANTENNADELAY,
     DWT_GETRXANTENNADELAY,
@@ -51,8 +53,8 @@ typedef enum
     DWT_RXENABLE,
     DWT_WRITETXDATA,
     DWT_READRXDATA,
-    DWT_WRITERXSCRATCHDATA,
-    DWT_READRXSCRATCHDATA,
+    DWT_WRITESCRATCHDATA,
+    DWT_READSCRATCHDATA,
     DWT_READCARRIERINTEGRATOR,
     DWT_ENABLEAUTOACK,
     DWT_CHECKDEVID,
@@ -124,9 +126,11 @@ typedef enum
     DWT_READSYSTIMESTAMPHI32,
     DWT_OTPREAD,
     DWT_SETPLENFINE,
+    DWT_SETPLLRXPREBUFEN,
     DWT_CALCPGCOUNT,
     DWT_SETGPIOMODE,
     DWT_SETGPIODIR,
+    DWT_GETGPIODIR,
     DWT_SETGPIOVALUE,
     DWT_GETDGCDECISION,
     DWT_SETDBLRXBUFFMODE,
@@ -159,7 +163,7 @@ typedef enum
     DWT_ADJ_TXPOWER,
     DWT_LINEAR_TXPOWER,
     DWT_CONVERT_TXPOWER_TO_IDX,
-    DWT_SET_PLL_CONFIG,
+    DWT_SET_PLLBIASTRIM,
     DWT_DIS_OTP_IPS,
     DWT_CAPTURE_ADC,
     DWT_READ_ADC_SAMPLES,
@@ -191,7 +195,6 @@ typedef enum
     /* END: CHIP_SPECIFIC_SECTION DW3720 */
     /* BEGIN: MCPS SPECIFIC IOCTL */
     DWT_SET_STS_LEN,
-    DWT_CFG_STS,
     DWT_SET_PHR,
     DWT_SET_DATARATE,
     DWT_SET_PAC,
@@ -398,10 +401,10 @@ struct dwt_adj_tx_power_s
     uint16_t* applied_boost;
 };
 
-struct dwt_calculate_linear_tx_setting_s
+struct dwt_calculate_linear_tx_power_s
 {
     int32_t result;
-    int32_t channel;
+    uint32_t channel;
     power_indexes_t* txp_indexes;
     tx_adj_res_t* txp_res;
 };
@@ -409,7 +412,7 @@ struct dwt_calculate_linear_tx_setting_s
  struct dwt_convert_tx_power_to_index_s
 {
     int result;
-    int channel;
+    uint32_t channel;
     uint8_t tx_power;
     uint8_t* tx_power_idx;
 };
@@ -431,7 +434,7 @@ struct dwt_set_pll_cal_s
 struct dwt_set_xtal_cal_s
 {
     dwt_xtal_trim_t *params;
-    uint8_t *xtaltrim; 
+    uint8_t *xtaltrim;
 };
 
 struct dwt_calculate_rssi_s
@@ -454,6 +457,11 @@ struct dwt_readdiagnostics_acc_s
     dwt_acc_idx_e acc_idx;
 };
 
+struct dwt_getframelength_s
+{
+    uint16_t frame_len;
+    uint8_t rng_bit;
+};
 
 struct dwchip_s;
 struct dw_rx_s;
@@ -478,7 +486,7 @@ struct dwt_spi_s
     * output parameters:
     * returns DWT_SUCCESS for success, or DWT_ERROR for error
     */
-    int16_t (*readfromspi)(uint16_t headerLength, /*const*/ uint8_t *headerBuffer, uint16_t readlength, uint8_t *readBuffer);
+    int32_t (*readfromspi)(uint16_t headerLength, /*const*/ uint8_t *headerBuffer, uint16_t readlength, uint8_t *readBuffer);
 
 /*! ------------------------------------------------------------------------------------------------------------------
     * @brief writetospi
@@ -493,7 +501,7 @@ struct dwt_spi_s
     * output parameters:
     * returns DWT_SUCCESS for success, or DWT_ERROR for error
     */
-    int16_t (*writetospi)(uint16_t headerLength, const uint8_t *headerBuffer, uint16_t bodyLength, const uint8_t *bodyBuffer);
+    int32_t (*writetospi)(uint16_t headerLength, const uint8_t *headerBuffer, uint16_t bodyLength, const uint8_t *bodyBuffer);
 
 /*! ------------------------------------------------------------------------------------------------------------------
     * @brief writetospiwithcrc
@@ -509,7 +517,7 @@ struct dwt_spi_s
     * output parameters:
     * returns DWT_SUCCESS for success, or DWT_ERROR for error
     */
-    int16_t (*writetospiwithcrc)(uint16_t headerLength, const uint8_t *headerBuffer, uint16_t bodyLength, const uint8_t *bodyBuffer, uint8_t crc8);
+    int32_t (*writetospiwithcrc)(uint16_t headerLength, const uint8_t *headerBuffer, uint16_t bodyLength, const uint8_t *bodyBuffer, uint8_t crc8);
 
     /*! ------------------------------------------------------------------------------------------------------------------
      * @brief setslowrate
@@ -594,8 +602,8 @@ struct dwchip_s
     int8_t coex_gpio_pin;
     int8_t coex_gpio_active_state;
 
-    /** driver data*/
-    void *priv; // last
+    /** Driver data*/
+    dwt_local_data_t priv; // last
 };
 typedef struct dwchip_s dwchip_t;
 
@@ -627,7 +635,7 @@ struct dwt_ops_s
     void (*read_rx_data)(struct dwchip_s *dw, uint8_t *buffer, uint16_t length, uint16_t rxBufferOffset);
     void (*read_acc_data)(struct dwchip_s *dw, uint8_t *buffer, uint16_t length, uint16_t accOffset);
     void (*read_rx_timestamp)(struct dwchip_s *dw, uint8_t *timestamp);
-    void (*read_cir)(dwchip_t *dw, uint32_t *buffer, dwt_acc_idx_e cir_idx, uint16_t sample_offs, uint16_t num_samples, dwt_cir_read_mode_e mode);
+    int (*read_cir)(dwchip_t *dw, uint32_t *buffer, dwt_acc_idx_e cir_idx, uint16_t sample_offs, uint16_t num_samples, dwt_cir_read_mode_e mode);
     void (*configure_tx_rf)(struct dwchip_s *dw, dwt_txconfig_t *config);
     void (*set_interrupt)(struct dwchip_s *dw, uint32_t bitmask_lo, uint32_t bitmask_hi, dwt_INT_options_e INT_options);
     int32_t (*rx_enable)(struct dwchip_s *dw, int32_t mode);

@@ -63,7 +63,4 @@ int16_t app_run_ieee_802_15_4z_schedule (void);
 int16_t app_read_log_info (app_log_info_t *info);
 
 
-void app_sleep (uint16_t ms);
-
-
 #endif

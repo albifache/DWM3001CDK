@@ -43,6 +43,8 @@
 #define TX_ANT_DELAY_OFFSET                     0
 #define RX_ANT_DELAY_OFFSET                     16
 
+#define STARTUP_TIME                            2
+
 
 static bool deca_init_done = false;
 static deca_hw_info_t deca_hw_info;
@@ -66,6 +68,9 @@ int16_t deca_init (void)
         return PORT_INIT_ERROR;
     }
 
+    // Set slow SPI data rate until IDLE_RC is reached
+    deca_set_spi_slow_rate();
+
     // Reset DW3000 IC
     ret = deca_reset_ic();
     if (ret != PORT_SUCCESS)
@@ -78,6 +83,9 @@ int16_t deca_init (void)
 
     // Wait until DW3000 IC is in IDLE_RC state before proceeding
     while (!dwt_checkidlerc());
+
+    // Set SPI fast data rate
+    deca_set_spi_fast_rate();
 
     // Initialise DW3000 IC
     ret = dwt_initialise(DWT_DW_INIT);
@@ -220,4 +228,24 @@ int16_t deca_read_device_info (deca_hw_info_t *info)
 bool deca_init_check (void)
 {
     return deca_init_done;
+}
+
+
+void deca_begin_deepsleep (void)
+{
+    dwt_entersleep(DWT_DW_IDLE);
+}
+
+
+void deca_wake_up (void)
+{
+    // Wake up DW3000 through IO pin
+    dwt_wakeup_ic();
+
+    // Wait until DW3000 is in IDLE_RC state before proceeding
+    while (!dwt_checkidlerc());
+
+    // Restore the required configurations on wake-up
+    dwt_restore_common();
+    dwt_restore_txrx(DWT_RESTORE_TXRX_MODE);
 }

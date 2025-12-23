@@ -58,15 +58,15 @@ int16_t deca_reset_ic (void);
 
 
 // Transmit over SPI (header, data , CRC) with CRC mode enabled
-int16_t deca_write_to_spi_with_crc (uint16_t header_len, const uint8_t header[], uint16_t data_len, const uint8_t data[], uint8_t crc8);
+int32_t deca_write_to_spi_with_crc (uint16_t header_len, const uint8_t header[], uint16_t data_len, const uint8_t data[], uint8_t crc8);
 
 
 // Transmit over SPI (header, data) with CRC mode disabled
-int16_t deca_write_to_spi (uint16_t header_len, const uint8_t header[], uint16_t data_len, const uint8_t data[]);
+int32_t deca_write_to_spi (uint16_t header_len, const uint8_t header[], uint16_t data_len, const uint8_t data[]);
 
 
 // Trasmit header and receive data over SPI with CRC mode disabled
-int16_t deca_read_from_spi (uint16_t header_len, uint8_t header[], uint16_t data_len, uint8_t data[]);
+int32_t deca_read_from_spi (uint16_t header_len, uint8_t header[], uint16_t data_len, uint8_t data[]);
 
 
 // set SPI data rate to 2 MHz
@@ -75,14 +75,6 @@ void deca_set_spi_slow_rate (void);
 
 // set SPI data rate to 8 MHz
 void deca_set_spi_fast_rate (void);
-
-
-// Defined just for compatibility, does not have any effect
-decaIrqStatus_t deca_mutex_on(void);
-
-
-// Defined just for compatibility, does not have any effect
-void deca_mutex_off (decaIrqStatus_t status);
 
 
 // Sleep for time_ms milliseconds
@@ -117,12 +109,22 @@ bool deca_init_check (void);
 int16_t deca_read_device_info (deca_hw_info_t *info);
 
 
-// Initialize UART
-int16_t serial_uart_init (void);
+// Set DW3000 IC in deep sleep mode
+void deca_begin_deepsleep(void);
 
 
-// Write to serial port
-int16_t serial_uart_write (uint8_t tx_buf[], uint16_t tx_buf_len);
+// Wake up DW3000 IC from deep sleep mode
+void deca_wake_up(void);
+
+
+// Prevent macro conflicts with Zephyr
+#ifdef GPIO_DIR_MASK
+#undef GPIO_DIR_MASK
+#endif
+
+#ifdef SPI_MODE_MASK  
+#undef SPI_MODE_MASK
+#endif
 
 
 #endif

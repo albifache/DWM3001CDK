@@ -3,11 +3,11 @@
  * @author      Alberto Facheris
  */
 
-
+ 
+#include "port.h"
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
-#include "port.h"
 
 
 #define LED_GPIO_DEV_NODE                   DT_NODELABEL(gpio0)
@@ -126,5 +126,8 @@ int16_t led_gpio_read (uint8_t led_id)
         return PORT_RUN_ERROR;
     }
 
-    return led_state[led_id];
+    // Read LED state
+    bool state = led_state[led_id];
+
+    return state;
 }

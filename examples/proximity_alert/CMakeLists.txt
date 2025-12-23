@@ -25,7 +25,7 @@ set(APP_SOURCES
     ../../port/deca_sleep.c
     ../../port/deca_spi.c
     ../../port/deca_probe_interface.c
-    ../../port/deca_init.c
+    ../../port/deca_utils.c
 
     # DW3000 driver (Qorvo API)
     ../../deca_driver/deca_compat.c

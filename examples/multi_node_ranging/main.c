@@ -11,6 +11,8 @@
 #include "../../phy/phy.h"
 #include "../../port/port.h"   
 #include <stdio.h>
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
 #include <zephyr/sys/printk.h>
 
 
@@ -24,7 +26,7 @@
 #define PAN_ID                                  0x00u                       // PAN ID of current network
 
 #define STS_KEY_0                               0ul                         // STS key (bits 0-31)
-#define STS_KEY_1                               0ul                         // STS key (bits 32-63)
+#define STS_KEY_1                               1ul                         // STS key (bits 32-63)
 #define STS_KEY_2                               0ul                         // STS key (bits 64-95)
 #define STS_KEY_3                               0ul                         // STS key (bits 96-127)
 
@@ -33,7 +35,7 @@
 #define AES_KEY_2                               0ul                         // AES key (bits 64-95)
 #define AES_KEY_3                               0ul                         // AES key (bits 96-127)
 
-#define NUM_NODES                               6                           // Number of nodes (max 8)
+#define NUM_NODES                               8                           // Number of nodes (max 8)
 
 #define NODE_MAC_ADDR_0                         0x00                        // MAC address of node 0
 #define NODE_MAC_ADDR_1                         0x01                        // MAC address of node 1
@@ -41,10 +43,10 @@
 #define NODE_MAC_ADDR_3                         0x06                        // MAC address of node 3
 #define NODE_MAC_ADDR_4                         0x07                        // MAC address of node 4
 #define NODE_MAC_ADDR_5                         0x09                        // MAC address of node 5
-#define NODE_MAC_ADDR_6                         0                           // MAC address of node 6 (unused in this case)
-#define NODE_MAC_ADDR_7                         0                           // MAC address of node 7 (unused in this case)
+#define NODE_MAC_ADDR_6                         0x0A                        // MAC address of node 6
+#define NODE_MAC_ADDR_7                         0x0F                        // MAC address of node 7
 
-#define GUARD_TIME                              10                          // Guard time (ms)
+#define GUARD_TIME                              1                           // Guard time (ms)
 #define SLEEP_TIME                              1000                        // Sleeping time (ms)
 
 #define LIGHT_SPEED                             2.99702547e8f               // Speed of light (m/s)
@@ -147,22 +149,24 @@ int main (void)
     // Begin loop
     while (1)
     {
-        #if (MAC_ADDR == PAN_COORDINATOR_MAC_ADDR)
-        
-        // Wait a bit before proceeding to make sure anchors have receiver switched on
-        app_sleep(GUARD_TIME);
-        
-        // Select which node will operate as tag
-        node_id++;
-        node_id %= NUM_NODES;
-        app_ctrl_obj.tag_mac_addr = node_mac_addr[node_id];
-        ret = app_set_ctrl_params(&app_ctrl_obj);
-        if (ret != APP_SUCCESS)
+        // Wait a bit before proceeding to make sure all the anchors have receiver switched on
+        if (MAC_ADDR == PAN_COORDINATOR_MAC_ADDR)
         {
-            continue;
+            k_msleep(GUARD_TIME);
         }
         
-        #endif
+        // Select which node will operate as tag
+        if (MAC_ADDR == PAN_COORDINATOR_MAC_ADDR)
+        {
+            node_id++;
+            node_id %= NUM_NODES;
+            app_ctrl_obj.tag_mac_addr = node_mac_addr[node_id];
+            ret = app_set_ctrl_params(&app_ctrl_obj);
+            if (ret != APP_SUCCESS)
+            {
+                continue;
+            }
+        }
 
         // Run ranging session
         ret = app_run_ieee_802_15_4z_schedule();
@@ -171,13 +175,16 @@ int main (void)
             continue;
         }
 
+        // Begin deep sleep mode (low-power state)
+        deca_begin_deepsleep();
+
         // Read ranging session results
         app_read_log_info(&app_log_info);
         
         // Compute distances (m)
         for (uint16_t k = 0; k < NUM_NODES; k++)
         {
-            dist[k] = DWT_TIME_UNITS * LIGHT_SPEED * app_log_info.dist[k];
+            dist[k] = LIGHT_SPEED * (float) DWT_TIME_UNITS * app_log_info.dist[k];
         }
 
         // Log superframe ID on console
@@ -187,12 +194,15 @@ int main (void)
         for (uint16_t k = 0; k < NUM_NODES; k++)
         {
             printk("\tDistance from node 0x%02X to node 0x%02X: %.2f m.\n",
-                    node_mac_addr[node_id],
-                    node_mac_addr[k],
+                    app_log_info.tag_mac_addr,
+                    app_log_info.anchor_mac_addr[k],
                     (double) dist[k]);
         }
         
         // Sleep till next superframe
-        app_sleep(SLEEP_TIME);
+        k_msleep(SLEEP_TIME);
+
+        // Wake up DW3000 IC
+        deca_wake_up();
     }
 }

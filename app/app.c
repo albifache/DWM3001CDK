@@ -3,7 +3,6 @@
  * @author      Alberto Facheris
  */
 
-
 #include "app.h"
 #include "app_utils.h"
 #include "../mac/mac.h"
@@ -33,17 +32,15 @@
                                         SYS_STATUS_HI_SPIERR_BIT_MASK)
                                       
 #define RX_TIMEOUT_DISABLED             0  
-#define DEFAULT_RX_TIMEOUT              ((uint64_t) (3.0f * 0.001f / DWT_TIME_UNITS))       // RX timeout (ms)
-#define SLOT_TIME                       ((uint64_t) (6.0f * 0.001f / DWT_TIME_UNITS))       // Slot duration (ms)
+#define DEFAULT_RX_TIMEOUT              ((uint64_t) (4.0f * 0.001f / (float) DWT_TIME_UNITS))
+#define SLOT_TIME                       ((uint64_t) (15.0f * 0.001f / (float) DWT_TIME_UNITS))
 
-#define RX_GUARD_TIME                   ((uint64_t) (1.25f * 0.001f / DWT_TIME_UNITS))      // Guard time (ms) to switch on RX
-                                                                                            // before beginning of slot
+#define RX_GUARD_TIME                   ((uint64_t) (1.25f * 0.001f / (float) DWT_TIME_UNITS))
 #define DELAY_BEFORE_RX                 (SLOT_TIME - RX_GUARD_TIME)
-#define TRX_POLL_TIME                   50                                                  // Polling time (us) when waiting
-                                                                                            // for TRX operation completion
+#define TRX_POLL_TIME                   50
 
 #define CLOCK_CYCLE                     0x010000000000ull
-#define CLOCK_FINE_MASK                 0xFFFFFFFFull
+#define CLOCK_FINE_MASK                 0xFFFFFFFFFFull
 #define CLOCK_COARSE_MASK               0xFFFFFFFE00ull
 
 #define APP_VERSION                     1
@@ -105,7 +102,7 @@ typedef struct
 app_header_t;
 
 
-// Initialization parameters
+// Initialization parameters (user defined)
 static uint16_t mac_addr;
 static uint16_t pan_id;
 static dwt_sts_cp_key_t sts_key;
@@ -192,7 +189,6 @@ static int16_t app_header_write (app_header_t* app_header, uint8_t tx_buf[], uin
     return APP_SUCCESS;
 }
 
-
 static int16_t app_header_read (app_header_t* app_header, uint8_t rx_buf[], uint16_t rx_buf_len)
 {
     // Validate input
@@ -227,7 +223,6 @@ static int16_t app_header_read (app_header_t* app_header, uint8_t rx_buf[], uint
     return APP_SUCCESS;
 }
 
-
 static int16_t app_aes_encrypt (uint8_t tx_buffer[], uint16_t tx_frame_len)
 {
     // Configure AES engine
@@ -243,7 +238,7 @@ static int16_t app_aes_encrypt (uint8_t tx_buffer[], uint16_t tx_frame_len)
     dwt_configure_aes(&aes_config);
 
     // Generate nonce
-    uint8_t nonce[12];
+    uint8_t nonce[13];
     nonce[0] = 0;
     nonce[1] = 0;
     nonce[2] = slot_id;
@@ -256,6 +251,7 @@ static int16_t app_aes_encrypt (uint8_t tx_buffer[], uint16_t tx_frame_len)
     nonce[9] = (superframe_id >> 40) & 0xFF;
     nonce[10] = (superframe_id >> 48) & 0xFF;
     nonce[11] = (superframe_id >> 56) & 0xFF;
+    nonce[12] = 0;
 
     // Configure AES job
     dwt_aes_job_t aes_job;
@@ -279,7 +275,6 @@ static int16_t app_aes_encrypt (uint8_t tx_buffer[], uint16_t tx_frame_len)
     return APP_SUCCESS;
 }
 
-
 static int16_t app_aes_decrypt (uint8_t rx_buffer[], uint16_t rx_frame_len)
 {
     // Configure AES engine
@@ -295,7 +290,7 @@ static int16_t app_aes_decrypt (uint8_t rx_buffer[], uint16_t rx_frame_len)
     dwt_configure_aes(&aes_config);
 
     // Generate nonce
-    uint8_t nonce[12];
+    uint8_t nonce[13];
     nonce[0] = 0;
     nonce[1] = 0;
     nonce[2] = slot_id;
@@ -308,6 +303,7 @@ static int16_t app_aes_decrypt (uint8_t rx_buffer[], uint16_t rx_frame_len)
     nonce[9] = (superframe_id >> 40) & 0xFF;
     nonce[10] = (superframe_id >> 48) & 0xFF;
     nonce[11] = (superframe_id >> 56) & 0xFF;
+    nonce[12] = 0;
 
     // Configure AES job
     dwt_aes_job_t aes_job;
@@ -422,7 +418,7 @@ static int16_t app_wait_rx_done (void)
             return APP_SUCCESS;
         }
 
-        // Check if PHY errors occurred or timeouts expired during reception
+        // Check if RX errors occurred or timeouts expired during reception
         else if (sys_status_lo & SYS_STATUS_RX_ERROR)
         {
             dwt_writesysstatuslo(SYS_STATUS_RX_ERROR);
@@ -644,7 +640,7 @@ static int16_t app_wait_init_msg (void)
         anchor_mac_addr[k] = (uint16_t) rx_buffer[HEADER_LEN + 3 + 2 * k];
         anchor_mac_addr[k] |= ((uint16_t) rx_buffer[HEADER_LEN + 4 + 2 * k]) << 8;
     }
-
+    
     // Check if the node has been selected as tag
     if (tag_mac_addr == mac_addr)
     {
@@ -670,7 +666,7 @@ static int16_t app_wait_init_msg (void)
 
     return APP_SUCCESS;
 }
- 
+
 
 static int16_t app_send_rqst_msg (void)
 {
@@ -752,7 +748,7 @@ static int16_t app_wait_rqst_msg (void)
     app_set_rx_timeout(DEFAULT_RX_TIMEOUT);
 
     // Set timestamp to switch on the receiver
-    app_set_delayed_trx_time(ts_rx_init + (slot_id - 1) * SLOT_TIME + DELAY_BEFORE_RX);
+    app_set_delayed_trx_time((ts_rx_init + (slot_id - 1) * SLOT_TIME + DELAY_BEFORE_RX) & CLOCK_COARSE_MASK);
 
     // Generate STS
     app_sts_generate();
@@ -829,7 +825,7 @@ static int16_t app_wait_rqst_msg (void)
     return APP_SUCCESS;
 }
 
-      
+
 static int16_t app_send_resp_msg (void)
 {
     int16_t ret;
@@ -910,7 +906,7 @@ static int16_t app_wait_resp_msg (void)
     app_set_rx_timeout(DEFAULT_RX_TIMEOUT);
 
     // Set timestamp to switch on the receiver
-    app_set_delayed_trx_time(ts_rx_init + (slot_id - 1) * SLOT_TIME + DELAY_BEFORE_RX);
+    app_set_delayed_trx_time((ts_rx_init + (slot_id - 1) * SLOT_TIME + DELAY_BEFORE_RX) & CLOCK_COARSE_MASK);
 
     // Generate STS
     app_sts_generate();
@@ -996,7 +992,7 @@ static int16_t app_send_report_msg (void)
     int16_t ret;
 
     // Set TX frame length
-    uint16_t tx_frame_len = HEADER_LEN + 8 + 4 * num_anchors + MIC_LEN + FCS_LEN;
+    uint16_t tx_frame_len = HEADER_LEN + 10 + 5 * num_anchors + MIC_LEN + FCS_LEN;
     dwt_writetxfctrl(tx_frame_len, NULL_TX_BUFFER_OFFSET, RANGING_BIT_ENABLED);
 
     // Create TX buffer
@@ -1032,24 +1028,27 @@ static int16_t app_send_report_msg (void)
     tx_buffer[HEADER_LEN + 1] = (ts_tx_rqst >> 8) & 0xFF;
     tx_buffer[HEADER_LEN + 2] = (ts_tx_rqst >> 16) & 0xFF;
     tx_buffer[HEADER_LEN + 3] = (ts_tx_rqst >> 24) & 0xFF;
+    tx_buffer[HEADER_LEN + 4] = (ts_tx_rqst >> 32) & 0xFF;
     
     // Write RX timestamp of RESPONSE messages
     for (uint8_t k = 0; k < num_anchors; k++)
     {
-        tx_buffer[HEADER_LEN + 4 + 4 * k] = ts_rx_resp[k] & 0xFF;
-        tx_buffer[HEADER_LEN + 5 + 4 * k] = (ts_rx_resp[k] >> 8) & 0xFF;
-        tx_buffer[HEADER_LEN + 6 + 4 * k] = (ts_rx_resp[k] >> 16) & 0xFF;
-        tx_buffer[HEADER_LEN + 7 + 4 * k] = (ts_rx_resp[k] >> 24) & 0xFF;
+        tx_buffer[HEADER_LEN + 5 + 5 * k] = ts_rx_resp[k] & 0xFF;
+        tx_buffer[HEADER_LEN + 6 + 5 * k] = (ts_rx_resp[k] >> 8) & 0xFF;
+        tx_buffer[HEADER_LEN + 7 + 5 * k] = (ts_rx_resp[k] >> 16) & 0xFF;
+        tx_buffer[HEADER_LEN + 8 + 5 * k] = (ts_rx_resp[k] >> 24) & 0xFF;
+        tx_buffer[HEADER_LEN + 9 + 5 * k] = (ts_rx_resp[k] >> 32) & 0xFF;
     }
 
     // Set TX timestamp of REPORT message
     ts_tx_rpt = (ts_rx_init + slot_id * SLOT_TIME) & CLOCK_COARSE_MASK;
 
     // Write TX timestamp of REPORT message
-    tx_buffer[HEADER_LEN + 4 + 4 * num_anchors] = ts_tx_rpt & 0xFF;
-    tx_buffer[HEADER_LEN + 5 + 4 * num_anchors] = (ts_tx_rpt >> 8) & 0xFF;
-    tx_buffer[HEADER_LEN + 6 + 4 * num_anchors] = (ts_tx_rpt >> 16) & 0xFF;
-    tx_buffer[HEADER_LEN + 7 + 4 * num_anchors] = (ts_tx_rpt >> 24) & 0xFF;
+    tx_buffer[HEADER_LEN + 5 + 5 * num_anchors] = ts_tx_rpt & 0xFF;
+    tx_buffer[HEADER_LEN + 6 + 5 * num_anchors] = (ts_tx_rpt >> 8) & 0xFF;
+    tx_buffer[HEADER_LEN + 7 + 5 * num_anchors] = (ts_tx_rpt >> 16) & 0xFF;
+    tx_buffer[HEADER_LEN + 8 + 5 * num_anchors] = (ts_tx_rpt >> 24) & 0xFF;
+    tx_buffer[HEADER_LEN + 9 + 5 * num_anchors] = (ts_tx_rpt >> 32) & 0xFF;
 
     // Set TX timestamp
     app_set_delayed_trx_time(ts_tx_rpt);
@@ -1094,7 +1093,7 @@ static int16_t app_wait_report_msg (void)
     app_set_rx_timeout(DEFAULT_RX_TIMEOUT);
 
     // Set timestamp to switch on the receiver
-    app_set_delayed_trx_time(ts_rx_init + (slot_id - 1) * SLOT_TIME + DELAY_BEFORE_RX);
+    app_set_delayed_trx_time((ts_rx_init + (slot_id - 1) * SLOT_TIME + DELAY_BEFORE_RX) & CLOCK_COARSE_MASK);
 
     // Generate STS
     app_sts_generate();
@@ -1170,23 +1169,26 @@ static int16_t app_wait_report_msg (void)
     ts_tx_rqst |= ((uint64_t)rx_buffer[HEADER_LEN + 1]) << 8;
     ts_tx_rqst |= ((uint64_t)rx_buffer[HEADER_LEN + 2]) << 16;
     ts_tx_rqst |= ((uint64_t)rx_buffer[HEADER_LEN + 3]) << 24;
+    ts_tx_rqst |= ((uint64_t)rx_buffer[HEADER_LEN + 4]) << 32;
 
     // Read RX timestamp of RESPONSE message
-    ts_rx_resp[anchor_id] = (uint64_t)rx_buffer[HEADER_LEN + 4 + 4 * anchor_id];
-    ts_rx_resp[anchor_id] |= ((uint64_t)rx_buffer[HEADER_LEN + 5 + 4 * anchor_id]) << 8;
-    ts_rx_resp[anchor_id] |= ((uint64_t)rx_buffer[HEADER_LEN + 6 + 4 * anchor_id]) << 16;
-    ts_rx_resp[anchor_id] |= ((uint64_t)rx_buffer[HEADER_LEN + 7 + 4 * anchor_id]) << 24;
+    ts_rx_resp[anchor_id] = (uint64_t)rx_buffer[HEADER_LEN + 5 + 5 * anchor_id];
+    ts_rx_resp[anchor_id] |= ((uint64_t)rx_buffer[HEADER_LEN + 6 + 5 * anchor_id]) << 8;
+    ts_rx_resp[anchor_id] |= ((uint64_t)rx_buffer[HEADER_LEN + 7 + 5 * anchor_id]) << 16;
+    ts_rx_resp[anchor_id] |= ((uint64_t)rx_buffer[HEADER_LEN + 8 + 5 * anchor_id]) << 24;
+    ts_rx_resp[anchor_id] |= ((uint64_t)rx_buffer[HEADER_LEN + 9 + 5 * anchor_id]) << 32;
 
     // Read TX timestamp of REPORT message
-    ts_tx_rpt = (uint64_t)rx_buffer[HEADER_LEN + 4 + 4 * num_anchors];
-    ts_tx_rpt |= ((uint64_t)rx_buffer[HEADER_LEN + 5 + 4 * num_anchors]) << 8;
-    ts_tx_rpt |= ((uint64_t)rx_buffer[HEADER_LEN + 6 + 4 * num_anchors]) << 16;
-    ts_tx_rpt |= ((uint64_t)rx_buffer[HEADER_LEN + 7 + 4 * num_anchors]) << 24;
+    ts_tx_rpt = (uint64_t)rx_buffer[HEADER_LEN + 5 + 5 * num_anchors];
+    ts_tx_rpt |= ((uint64_t)rx_buffer[HEADER_LEN + 6 + 5 * num_anchors]) << 8;
+    ts_tx_rpt |= ((uint64_t)rx_buffer[HEADER_LEN + 7 + 5 * num_anchors]) << 16;
+    ts_tx_rpt |= ((uint64_t)rx_buffer[HEADER_LEN + 8 + 5 * num_anchors]) << 24;
+    ts_tx_rpt |= ((uint64_t)rx_buffer[HEADER_LEN + 9 + 5 * num_anchors]) << 32;
 
     // Read RX timestamp of REPORT message
     ts_rx_rpt = app_read_rx_timestamp();
 
-    // Compute distance (DS-TWR formula) if RESP message was successfully received
+    // Compute distance if RESP message was successfully received
     if (ts_rx_resp[anchor_id] != 0ULL)
     {
         uint64_t rtt_a = ((ts_rx_resp[anchor_id] | CLOCK_CYCLE) - ts_tx_rqst) & CLOCK_FINE_MASK;
@@ -1256,6 +1258,7 @@ static int16_t app_send_final_msg (void)
         return APP_RUN_ERROR;
     }
 
+    // Start transmission (delayed)
     ret = dwt_starttx(DWT_START_TX_DELAYED);
     if (ret != DWT_SUCCESS)
     {
@@ -1285,7 +1288,7 @@ static int16_t app_wait_final_msg (void)
     app_set_rx_timeout(DEFAULT_RX_TIMEOUT);
 
     // Set timestamp to switch on receiver
-    app_set_delayed_trx_time(ts_rx_init + (slot_id - 1) * SLOT_TIME + DELAY_BEFORE_RX);
+    app_set_delayed_trx_time((ts_rx_init + (slot_id - 1) * SLOT_TIME + DELAY_BEFORE_RX) & CLOCK_COARSE_MASK);
 
     // Generate STS
     app_sts_generate();
@@ -1477,7 +1480,7 @@ int16_t app_run_ieee_802_15_4z_schedule (void)
                     app_state =  APP_STATE_WAIT_INIT_MSG;
                 }
 
-                // Check if transmission was successful
+                // Check if reception was successful
                 else
                 {
                     switch (node_type)
@@ -1674,15 +1677,21 @@ int16_t app_run_ieee_802_15_4z_schedule (void)
 
 
 int16_t app_init (app_init_obj_t *obj)
-{
+{    
     // Check if pointer is valid
     if (obj == NULL)
     {
         return APP_INIT_ERROR;
     }
 
-    // Check if MAC address and PAN ID are valid
-    if (obj->mac_addr == BROADCAST_MAC_ADDR || obj->pan_id == BROADCAST_PAN_ID)
+    // Check if MAC address is valid
+    if (obj->mac_addr == BROADCAST_MAC_ADDR)
+    {
+        return APP_INIT_ERROR;
+    }
+
+    // Check if PAN ID is valid
+    if (obj->pan_id == BROADCAST_PAN_ID)
     {
         return APP_INIT_ERROR;
     }
@@ -1793,12 +1802,4 @@ int16_t app_read_log_info (app_log_info_t *info)
     }
 
     return APP_SUCCESS;
-}
-
-
-void app_sleep (uint16_t ms)
-{
-    deca_sleep(ms);
-
-    return;
 }

@@ -9,7 +9,7 @@
 #include "port.h"
 
 
-// Sleep for time_ms milliseconds
+// Sleep for sleep_time_ms milliseconds
 void deca_sleep (uint16_t sleep_time_ms)
 {
     k_msleep(sleep_time_ms);
@@ -18,7 +18,7 @@ void deca_sleep (uint16_t sleep_time_ms)
 }
 
 
-// Sleep for time_us microseconds
+// Sleep for sleep_time_us microseconds
 void deca_usleep (uint32_t sleep_time_us)
 {
     k_usleep(sleep_time_us);

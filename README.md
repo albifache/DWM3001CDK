@@ -12,14 +12,14 @@ This project is intended for educational and research purposes. For production d
 
 ## Overview
 
-An advanced real-time positioning framework for DWM3001CDK modules, delivering precise location tracking via DS-TWR, over-the-air real-time network reconfigurability, secure ranging feature and massive collision-free scalability (60,000+ devices) through TDMA coordination.
+An advanced real-time positioning framework for DWM3001CDK modules, delivering precise location tracking via DS-TWR, over-the-air real-time network reconfigurability, low-power operational mode option, secure ranging feature and massive collision-free scalability (60,000+ devices) through TDMA coordination.
 
 ## Project Components
 
 - **Qorvo/Decawave DW3000 driver** (slightly modified to reduce unnecessary memory usage)
 - **Port to Zephyr RTOS** for DWM3001CDK modules (nRF52833 MCU)
 - **Low-level functions** to access pre-calibrated parameters stored in DW3000 OTP memory
-- **Application protocol** based on IEEE 802.15.4z standard, relying on DS-TWR to measure distances and TDMA to handle multiple concurrent devices without collisions, while also featuring a novel, dynamic, real-time and over-the-air (OTA) role assignment protocol. The protocol also features secure ranging, resistant against replay attacks, thanks to STS and AES encryption
+- **Application protocol** based on IEEE 802.15.4z standard, relying on DS-TWR to measure distances (with optional low-power operational mode thanks to sleep states) and TDMA to handle multiple concurrent devices without collisions, while also featuring a novel, dynamic, real-time and over-the-air (OTA) role assignment protocol. The protocol also features secure ranging, resistant against replay attacks, thanks to STS and AES encryption. This framework does NOT include additional security features, such as secure boot, firmware encryption, and secure key storage and infradevice transfer.
 
 ## Features
 
@@ -28,6 +28,7 @@ An advanced real-time positioning framework for DWM3001CDK modules, delivering p
 - **Multi-node Support**: Handles multiple anchors and tags in the same PAN
 - **TDMA Coordination**: Time-slotted multiple access prevents collisions and interference
 - **DS-TWR Protocol**: Double-sided two-way ranging for accurate distance measurements
+- **Battery saver**: Low-power consumption optimization, obtained through deep sleep mode and periodic wake up
 - **Real-time Processing**: Immediate distance calculations and alerts
 - **LED Indicators**: Visual feedback for proximity alerts and system status
 
@@ -76,6 +77,7 @@ DWM3001CDK/
 │   ├── deca_probe_interface.h              # Device probe interface header
 │   ├── deca_sleep.c                        # Blocking delays
 │   ├── deca_spi.c                          # DW3000 SPI interface
+│   ├── deca_utils.c                        # DW3000 IC low level API (operational state, initialization, hardware info)
 │   ├── led_gpio.c                          # LEDs interface
 │   ├── serial_uart.c                       # UART interface (unused at the moment)
 │   └── port.h                              # Port interface
@@ -158,7 +160,6 @@ int app_init (app_init_obj_t *obj);                                 // Initializ
 int app_set_ctrl_params (app_ctrl_obj_t *obj);                      // Set runtime parameters for ranging session
 int app_run_ieee_802_15_4z_schedule (void);                         // Run ranging protocol
 void app_read_log_info (app_log_info_t *info);                      // Read ranging session results
-void app_sleep (uint16_t ms);                                       // Sleep for ms milliseconds
 ```
 
 ### PHY Layer
@@ -175,6 +176,44 @@ typedef struct
 phy_init_obj_t;
 
 int phy_init (phy_init_obj_t *obj);                                 // Set PHY parameters
+```
+
+### DW3000 IC state
+
+```c
+typedef struct
+{
+    uint32_t device_id;                                             // Device ID (0xDECA0302)
+    uint32_t chip_id;                                               // Chip ID
+    uint64_t lot_id;                                                // Lot ID                                
+    uint8_t otp_rev;                                                // OTP version number
+    uint8_t xtal_trim;                                              // Crystal trimmer (precalibrated)
+    uint16_t rx_antd_ch5_prf16;                                     // RX antenna delay for channel 5 and PRF 16 MHz
+    uint16_t rx_antd_ch5_prf64;                                     // RX antenna delay for channel 5 and PRF 64 MHz
+    uint16_t rx_antd_ch9_prf16;                                     // RX antenna delay for channel 9 and PRF 16 MHz
+    uint16_t rx_antd_ch9_prf64;                                     // RX antenna delay for channel 9 and PRF 64 MHz
+    uint16_t tx_antd_ch5_prf16;                                     // TX antenna delay for channel 5 and PRF 16 MHz
+    uint16_t tx_antd_ch5_prf64;                                     // TX antenna delay for channel 5 and PRF 64 MHz
+    uint16_t tx_antd_ch9_prf16;                                     // TX antenna delay for channel 9 and PRF 16 MHz
+    uint16_t tx_antd_ch9_prf64;                                     // TX antenna delay for channel 9 and PRF 64 MHz
+    uint32_t tx_power_ch5_prf16;                                    // TX power for channel 5 and PRF 16 MHz
+    uint32_t tx_power_ch5_prf64;                                    // TX power for channel 5 and PRF 64 MHz
+    uint32_t tx_power_ch9_prf16;                                    // TX power for channel 9 and PRF 16 MHz
+    uint32_t tx_power_ch9_prf64;                                    // TX power for channel 9 and PRF 64 MHz
+}
+deca_hw_info_t;
+
+int16_t deca_init (void);                                           // Initialize DW3000 IC hardware
+int16_t deca_read_device_info (deca_hw_info_t *info);               // Read DW3000 IC hardware info
+void deca_begin_deepsleep (void);                                   // Set DW3000 IC in deep sleep state
+void deca_wake_up (void);                                           // Wake up DW3000 IC from deep sleep state
+```
+
+### LEDs
+
+```c
+int16_t led_gpio_write (uint8_t led_id, bool state);                // Set or reset LED (LED ID ranges from 0 to 3)
+int16_t led_gpio_read (uint8_t led_id);                             // Read LED state (LED ID ranges from 0 to 3)
 ```
 
 ## Support

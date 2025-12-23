@@ -289,5 +289,8 @@ int16_t phy_init (phy_init_obj_t *obj)
     dwt_setrxantennadelay(rx_ant_delay + tx_ant_delay);
     dwt_settxantennadelay(0);
 
+    // Set sleep mode configuration
+    dwt_configuresleep(DWT_CONFIG | DWT_PGFCAL, DWT_PRES_SLEEP | DWT_WAKE_CSN | DWT_SLP_EN);
+
     return PHY_SUCCESS;
 }
