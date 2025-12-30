@@ -33,7 +33,7 @@
                                       
 #define RX_TIMEOUT_DISABLED             0  
 #define DEFAULT_RX_TIMEOUT              ((uint64_t) (4.0f * 0.001f / (float) DWT_TIME_UNITS))
-#define SLOT_TIME                       ((uint64_t) (15.0f * 0.001f / (float) DWT_TIME_UNITS))
+#define SLOT_TIME                       ((uint64_t) (6.0f * 0.001f / (float) DWT_TIME_UNITS))
 
 #define RX_GUARD_TIME                   ((uint64_t) (1.25f * 0.001f / (float) DWT_TIME_UNITS))
 #define DELAY_BEFORE_RX                 (SLOT_TIME - RX_GUARD_TIME)
